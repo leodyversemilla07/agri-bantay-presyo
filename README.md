@@ -1,5 +1,7 @@
 # Bantay Presyo
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources, including weekly averages, daily prevailing prices, and supply indices, then stores it in a structured PostgreSQL database for easy querying and analysis.
 
 Built as a full-stack web application, it features:
@@ -20,9 +22,11 @@ This is a monorepo containing both backend and frontend code:
 ## Getting Started
 
 ### Prerequisites
-- Docker and Docker Compose (for local development)
-- Node.js 18+ (for frontend development)
-- Python 3.9+ (for backend development)
+- **Docker** and **Docker Compose** (for local development)
+- **Node.js 20+** (for frontend development)
+- **Python 3.12+** (for backend development)
+- **PostgreSQL** (handled by Docker, or install locally for development)
+- **PostgreSQL** (handled by Docker, or install locally for development)
 
 ### Local Development
 
@@ -68,4 +72,4 @@ The backend and frontend are designed to be deployed separately:
 
 ## License
 
-[Add your license here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
