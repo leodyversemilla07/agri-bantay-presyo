@@ -1,6 +1,10 @@
 # Bantay Presyo
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.127.1-green.svg)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.1.1-black.svg)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 
 Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources, including weekly averages, daily prevailing prices, and supply indices, then stores it in a structured PostgreSQL database for easy querying and analysis.
 
@@ -10,6 +14,26 @@ Built as a full-stack web application, it features:
 - **Data Processing**: Intelligent standardization of commodity names, spatial table extraction from PDFs, and support for multiple report types
 
 The system provides farmers, consumers, policymakers, and developers with real-time access to agricultural price trends, enabling better decision-making and research through an open API and user-friendly visualization tools.
+
+## Tech Stack
+
+### Backend
+- **Framework**: FastAPI 0.127.1 (Python)
+- **Database**: PostgreSQL 16
+- **Task Queue**: Celery + Redis
+- **PDF Processing**: pdfplumber
+- **Language**: Python 3.12
+
+### Frontend
+- **Framework**: Next.js 16.1.1 (React)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Runtime**: Node.js 20
+
+### Infrastructure
+- **Containerization**: Docker & Docker Compose
+- **Version Control**: Git
+- **CI/CD**: GitHub Actions (planned)
 
 ## Project Structure
 
@@ -25,7 +49,6 @@ This is a monorepo containing both backend and frontend code:
 - **Docker** and **Docker Compose** (for local development)
 - **Node.js 20+** (for frontend development)
 - **Python 3.12+** (for backend development)
-- **PostgreSQL** (handled by Docker, or install locally for development)
 - **PostgreSQL** (handled by Docker, or install locally for development)
 
 ### Local Development
