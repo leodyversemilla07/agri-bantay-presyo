@@ -1,5 +1,5 @@
 # Development Roadmap
-**Project:** Bantay Presyo
+**Project:** Agri Bantay Presyo
 
 ## Phase 1: Foundation & "Hello World" Prototype
 *   [ ] Set up FastAPI project structure with PostgreSQL connection.

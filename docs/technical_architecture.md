@@ -1,5 +1,5 @@
 # Technical Architecture & Scraper Logic
-**Project:** Bantay Presyo
+**Project:** Agri Bantay Presyo
 
 ## Recommended Tech Stack (The "Agri-Stack")
 *   **Backend API:** FastAPI (Python) - High performance; native support for `pdfplumber`.

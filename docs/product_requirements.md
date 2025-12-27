@@ -1,5 +1,5 @@
 # Product Requirements Document (PRD)
-**Project:** Bantay Presyo (Modernized Agricultural Price Monitoring System)
+**Project:** Agri Bantay Presyo (Modernized Agricultural Price Monitoring System)
 **Version:** 1.0 (Draft)
 
 ## 1. Executive Summary

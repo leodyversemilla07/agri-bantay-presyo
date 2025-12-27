@@ -1,4 +1,4 @@
-# Bantay Presyo
+# Agri Bantay Presyo
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
@@ -6,7 +6,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.1-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 
-Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources, including weekly averages, daily prevailing prices, and supply indices, then stores it in a structured PostgreSQL database for easy querying and analysis.
+Agri Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources, including weekly averages, daily prevailing prices, and supply indices, then stores it in a structured PostgreSQL database for easy querying and analysis.
 
 Built as a full-stack web application, it features:
 - **Backend**: FastAPI (Python) with automated PDF parsing using pdfplumber, scheduled scraping via Celery + Redis, and RESTful API endpoints

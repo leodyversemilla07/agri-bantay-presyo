@@ -1,5 +1,5 @@
 # API Specification
-**Project:** Bantay Presyo
+**Project:** Agri Bantay Presyo
 **Base URL:** `https://api.bantaypresyo.gov.ph/v1`
 
 ## Endpoints

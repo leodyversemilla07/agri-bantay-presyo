@@ -1,5 +1,5 @@
 # Database Schema
-**Project:** Bantay Presyo
+**Project:** Agri Bantay Presyo
 
 ## Table A: commodities (The Standardizer)
 *   **id (PK):** UUID

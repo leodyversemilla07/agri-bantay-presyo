@@ -1,6 +1,6 @@
 # Project Directory Structure
 
-This document outlines the folder structure for the **Agri-Bantay Presyo** project. The backend structure adheres to the official FastAPI best practices for scalable applications (often referred to as the "Title Project Structure").
+This document outlines the folder structure for the **Agri Bantay Presyo** project. The backend structure adheres to the official FastAPI best practices for scalable applications (often referred to as the "Title Project Structure").
 
 ## Root Directory
 ```
