@@ -3,14 +3,14 @@
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, Download, RefreshCw } from "lucide-react"
+import { useEffect, useState } from "react"
+import { fetchMarkets } from "@/lib/api"
 
-const markets = [
-  { id: "all", name: "All Markets" },
-  { id: "ncr", name: "NCR Markets" },
-  { id: "luzon", name: "Luzon Markets" },
-  { id: "visayas", name: "Visayas Markets" },
-  { id: "mindanao", name: "Mindanao Markets" },
-]
+interface Market {
+  id: string
+  name: string
+  region?: string
+}
 
 const dateRanges = [
   { id: "1d", name: "24 hours" },
@@ -28,12 +28,26 @@ interface MarketFiltersProps {
 }
 
 export function MarketFilters({ selectedMarket, onSelectMarket, dateRange, onDateRangeChange }: MarketFiltersProps) {
+  const [markets, setMarkets] = useState<Market[]>([{ id: "all", name: "All Markets" }])
+
+  useEffect(() => {
+    async function getMarkets() {
+      try {
+        const data = await fetchMarkets()
+        setMarkets([{ id: "all", name: "All Markets" }, ...data])
+      } catch (error) {
+        console.error("Error fetching markets:", error)
+      }
+    }
+    getMarkets()
+  }, [])
+
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-card rounded-xl border border-border shadow-sm">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-2">
+      <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
         <Select value={selectedMarket} onValueChange={onSelectMarket}>
-          <SelectTrigger className="w-44 bg-background border-border">
-            <SelectValue placeholder="Select market" />
+          <SelectTrigger className="w-[200px] h-9 bg-background border-border shadow-sm">
+            <SelectValue placeholder="All Markets" />
           </SelectTrigger>
           <SelectContent>
             {markets.map((market) => (
@@ -45,8 +59,8 @@ export function MarketFilters({ selectedMarket, onSelectMarket, dateRange, onDat
         </Select>
 
         <Select value={dateRange} onValueChange={onDateRangeChange}>
-          <SelectTrigger className="w-36 bg-background border-border">
-            <Calendar className="size-4 mr-2 text-muted-foreground" />
+          <SelectTrigger className="w-[140px] h-9 bg-background border-border shadow-sm">
+            <Calendar className="size-3.5 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Date range" />
           </SelectTrigger>
           <SelectContent>
@@ -58,14 +72,14 @@ export function MarketFilters({ selectedMarket, onSelectMarket, dateRange, onDat
           </SelectContent>
         </Select>
 
-        <Button variant="ghost" size="icon" className="size-9">
+        <Button variant="outline" size="icon" className="size-9 shadow-sm" onClick={() => window.location.reload()}>
           <RefreshCw className="size-4" />
         </Button>
       </div>
 
-      <Button variant="default" size="sm" className="gap-2">
-        <Download className="size-4" />
-        Export Data
+      <Button variant="outline" size="sm" className="gap-2 shadow-sm font-medium ml-auto sm:ml-0">
+        <Download className="size-3.5" />
+        Export CSV
       </Button>
     </div>
   )
