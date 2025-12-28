@@ -1,10 +1,9 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { TrendingUp, TrendingDown, Search, ChevronLeft, ChevronRight, Minus, Loader2 } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { fetchPrices } from "@/lib/api"
 
@@ -104,7 +103,7 @@ export function CommodityTable({ market }: CommodityTableProps) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border">
-                    <th className="text-left h-10 px-4 font-medium text-muted-foreground uppercase text-[11px] tracking-wider w-[240px]">
+                    <th className="text-left h-10 px-4 font-medium text-muted-foreground uppercase text-[11px] tracking-wider w-60">
                       Commodity
                     </th>
                     <th className="text-left h-10 px-4 font-medium text-muted-foreground uppercase text-[11px] tracking-wider hidden sm:table-cell">
@@ -131,7 +130,7 @@ export function CommodityTable({ market }: CommodityTableProps) {
                         {price.commodity?.name || "Unknown"}
                       </td>
                       <td className="py-3 px-4 hidden sm:table-cell">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded textxs font-medium ${categoryColors[price.commodity?.category || ""] || "bg-gray-100 text-gray-800"}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${categoryColors[price.commodity?.category || ""] || "bg-gray-100 text-gray-800"}`}>
                           {price.commodity?.category || "Other"}
                         </span>
                       </td>

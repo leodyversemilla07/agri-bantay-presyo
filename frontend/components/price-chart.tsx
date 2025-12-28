@@ -96,7 +96,7 @@ export function PriceChart({ commodity, dateRange, showVolume }: PriceChartProps
 
   if (loading) {
     return (
-      <Card className="bg-card border-border shadow-sm h-[300px] flex items-center justify-center">
+      <Card className="bg-card border-border shadow-sm h-75 flex items-center justify-center">
         <Loader2 className="animate-spin text-muted-foreground mr-2" />
         <span className="text-muted-foreground text-sm">Loading market data...</span>
       </Card>
@@ -105,12 +105,12 @@ export function PriceChart({ commodity, dateRange, showVolume }: PriceChartProps
 
   if (data.length === 0) {
     return (
-      <Card className="bg-card border-border shadow-sm h-[300px] flex flex-col items-center justify-center text-center p-6">
+      <Card className="bg-card border-border shadow-sm h-75 flex flex-col items-center justify-center text-center p-6">
         <div className="rounded-full bg-muted p-3 mb-3">
           <TrendingUp className="size-6 text-muted-foreground" />
         </div>
         <h3 className="text-sm font-semibold text-foreground">No Data Available</h3>
-        <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+        <p className="text-xs text-muted-foreground mt-1 max-w-50">
           We couldn't find price history for this selection. Try changing the filter.
         </p>
       </Card>
@@ -143,7 +143,7 @@ export function PriceChart({ commodity, dateRange, showVolume }: PriceChartProps
         </div>
       </CardHeader>
       <CardContent className="pb-4">
-        <div className="h-[240px] w-full mt-2">
+        <div className="h-60 w-full mt-2">
           <ResponsiveContainer width="100%" height="100%">
             {showVolume ? (
               <BarChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>

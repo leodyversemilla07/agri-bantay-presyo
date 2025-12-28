@@ -1,4 +1,3 @@
-import { Header } from "@/components/header"
 import { Hero } from "@/components/hero"
 import { PriceTicker } from "@/components/price-ticker"
 import { Dashboard } from "@/components/dashboard"

@@ -51,8 +51,8 @@ export function PriceTicker() {
 
   return (
     <div className="relative bg-primary/5 border-b border-border overflow-hidden h-12 flex items-center shadow-inner">
-      <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10" />
-      <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-background to-transparent z-10" />
+      <div className="absolute left-0 top-0 bottom-0 w-16 bg-linear-to-r from-background to-transparent z-10" />
+      <div className="absolute right-0 top-0 bottom-0 w-16 bg-linear-to-l from-background to-transparent z-10" />
 
       <div
         className="flex items-center gap-12 py-2 whitespace-nowrap will-change-transform"

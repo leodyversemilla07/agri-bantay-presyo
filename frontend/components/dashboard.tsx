@@ -5,7 +5,6 @@ import { StatsCards } from "@/components/stats-cards"
 import { PriceChart } from "@/components/price-chart"
 import { CommodityTable } from "@/components/commodity-table"
 import { MarketFilters } from "@/components/market-filters"
-import { Sidebar } from "@/components/sidebar"
 
 export function Dashboard() {
   const [selectedCommodity, setSelectedCommodity] = useState("rice")
@@ -14,7 +13,6 @@ export function Dashboard() {
 
   return (
     <div className="flex gap-6">
-      <Sidebar selectedCommodity={selectedCommodity} onSelectCommodity={setSelectedCommodity} />
       <div className="flex-1 space-y-6">
         <MarketFilters
           selectedMarket={selectedMarket}

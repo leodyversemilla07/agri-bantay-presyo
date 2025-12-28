@@ -46,7 +46,7 @@ export function MarketFilters({ selectedMarket, onSelectMarket, dateRange, onDat
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-2">
       <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
         <Select value={selectedMarket} onValueChange={onSelectMarket}>
-          <SelectTrigger className="w-[200px] h-9 bg-background border-border shadow-sm">
+          <SelectTrigger className="w-50 h-9 bg-background border-border shadow-sm">
             <SelectValue placeholder="All Markets" />
           </SelectTrigger>
           <SelectContent>
@@ -59,7 +59,7 @@ export function MarketFilters({ selectedMarket, onSelectMarket, dateRange, onDat
         </Select>
 
         <Select value={dateRange} onValueChange={onDateRangeChange}>
-          <SelectTrigger className="w-[140px] h-9 bg-background border-border shadow-sm">
+          <SelectTrigger className="w-35 h-9 bg-background border-border shadow-sm">
             <Calendar className="size-3.5 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Date range" />
           </SelectTrigger>
