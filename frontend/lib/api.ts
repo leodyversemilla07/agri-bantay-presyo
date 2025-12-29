@@ -10,14 +10,17 @@ export async function fetchCommodities(category?: string) {
   return response.json()
 }
 
-export async function fetchMarkets() {
-  const response = await fetch(`${API_BASE_URL}/markets`)
+export async function fetchMarkets(skip: number = 0, limit: number = 1000) {
+  const response = await fetch(`${API_BASE_URL}/markets?skip=${skip}&limit=${limit}`)
   if (!response.ok) throw new Error("Failed to fetch markets")
   return response.json()
 }
 
-export async function fetchPrices(date?: string) {
-  const url = date ? `${API_BASE_URL}/prices/daily?report_date=${date}` : `${API_BASE_URL}/prices/daily`
+export async function fetchPrices(date?: string, skip: number = 0, limit: number = 1000) {
+  let url = `${API_BASE_URL}/prices/daily?skip=${skip}&limit=${limit}`
+  if (date) {
+    url += `&report_date=${date}`
+  }
   const response = await fetch(url)
   if (!response.ok) throw new Error("Failed to fetch prices")
   return response.json()

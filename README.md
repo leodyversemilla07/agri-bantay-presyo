@@ -6,12 +6,12 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.1-black.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 
-Agri Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources, including weekly averages, daily prevailing prices, and supply indices, then stores it in a structured PostgreSQL database for easy querying and analysis.
+Agri Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources and uses **Google Gemini AI** to intelligently parse complex, inconsistent PDF layouts. Data is stored in a structured PostgreSQL database for easy querying and analysis.
 
 Built as a full-stack web application, it features:
-- **Backend**: FastAPI (Python) with automated PDF parsing using pdfplumber, scheduled scraping via Celery + Redis, and RESTful API endpoints
-- **Frontend**: Next.js (React) dashboard with interactive price charts, commodity tables, market filters, and a live price ticker
-- **Data Processing**: Intelligent standardization of commodity names, spatial table extraction from PDFs, and support for multiple report types
+- **Backend**: FastAPI (Python) with **AI-powered PDF processing**, robust data standardization, and RESTful API endpoints.
+- **Frontend**: Next.js (React) dashboard with a multi-page interface (Overview, Markets, Analytics), interactive charts, and real-time search.
+- **Data Processing**: Intelligent mapping of commodity names, automated backfilling of historical data (2018-Present), and conflict resolution for duplicate entries.
 
 The system provides farmers, consumers, policymakers, and developers with real-time access to agricultural price trends, enabling better decision-making and research through an open API and user-friendly visualization tools.
 
@@ -20,14 +20,16 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 ### Backend
 - **Framework**: FastAPI 0.127.1 (Python)
 - **Database**: PostgreSQL 16
-- **Task Queue**: Celery + Redis
-- **PDF Processing**: pdfplumber
+- **AI Engine**: Google Gemini 3 Flash Preview (via Google Gen AI SDK)
+- **PDF Processing**: pdfplumber (for text extraction) + Gemini (for parsing)
 - **Language**: Python 3.12
 
 ### Frontend
 - **Framework**: Next.js 16.1.1 (React)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS + shadcn/ui
+- **Visualization**: Recharts
+- **Icons**: Lucide React
 - **Runtime**: Node.js 20
 
 ### Infrastructure
@@ -39,9 +41,9 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 
 This is a monorepo containing both backend and frontend code:
 
-- `backend/` - FastAPI application with scraping, API, and database logic
-- `frontend/` - Next.js dashboard application
-- `docs/` - Project documentation, requirements, and architecture
+- `backend/` - FastAPI application with scraping logic, AI integration, and database models.
+- `frontend/` - Next.js application with `analytics`, `markets`, and `overview` pages.
+- `docs/` - Project documentation, requirements, and architecture.
 
 ## Getting Started
 

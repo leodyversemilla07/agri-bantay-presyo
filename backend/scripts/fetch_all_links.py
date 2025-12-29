@@ -132,7 +132,8 @@ def fetch_links():
                 is_relevant = False
 
             if is_relevant and date_str:
-                filtered_candidates.append(entry)
+                if date_str.startswith("2025"):
+                    filtered_candidates.append(entry)
         
         # 1. Save ALL links
         unique_all = {c['url']: c for c in all_candidates}.values()

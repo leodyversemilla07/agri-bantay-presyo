@@ -1,17 +1,21 @@
 # API Specification
 **Project:** Agri Bantay Presyo
-**Base URL:** `https://api.bantaypresyo.gov.ph/v1`
+**Base URL:** `http://localhost:8000/api/v1` (Local Dev)
 
 ## Endpoints
 
-### Commodities & Markets
-*   `GET /commodities`: Retrieves master list of agricultural products.
-*   `GET /markets`: Retrieves list of monitored markets.
+### Commodities (`/commodities`)
+*   `GET /`: List all tracked commodities (supports filtering by category).
+*   `GET /{id}`: Get details for a specific commodity.
 
-### Price Data
-*   `GET /prices/daily`: Returns Prevailing Price for a specific date.
-*   `GET /prices/weekly`: Returns Average Price data for trend analysis.
+### Markets (`/markets`)
+*   `GET /`: List all monitored trading centers/markets.
+*   `GET /{id}`: Get details for a specific market.
 
-### Analytics & Trends
-*   `GET /trends/history`: Returns historical data points for line charts.
-*   `GET /stats/movers`: Returns "Top Gainers" and "Top Losers" for the homepage ticker.
+### Price Data (`/prices`)
+*   `GET /latest`: Returns the most recent price entries for all commodities.
+*   `GET /history`: Returns historical price points (supports `commodity_id` and `date_range` filters).
+
+### Analytics & Stats (`/stats`, `/trends`)
+*   `GET /stats/dashboard`: Returns aggregate counts for Commodities, Markets, and Prices.
+*   `GET /trends/summary`: Returns "Top Gainers" and "Top Losers" summary.

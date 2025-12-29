@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Table, BarChart3, Wheat } from "lucide-react"
+import { LayoutDashboard, Table, BarChart3 } from "lucide-react"
 
 export function Navbar() {
     const pathname = usePathname()
@@ -19,8 +20,14 @@ export function Navbar() {
                 <div className="flex h-16 items-center justify-between">
                     <div className="flex items-center gap-6">
                         <Link href="/" className="flex items-center gap-2 group">
-                            <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                                <Wheat className="size-5 text-primary" />
+                            <div className="size-10 flex items-center justify-center transition-transform group-hover:scale-105">
+                                <Image
+                                    src="/logo.svg"
+                                    alt="Agri Bantay Presyo Logo"
+                                    width={40}
+                                    height={40}
+                                    className="w-full h-full object-contain"
+                                />
                             </div>
                             <span className="font-black text-lg tracking-tighter">
                                 Agri <span className="text-primary italic">Bantay</span>
@@ -36,8 +43,8 @@ export function Navbar() {
                                         key={link.href}
                                         href={link.href}
                                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${isActive
-                                                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                                                : "text-foreground/60 hover:text-foreground hover:bg-muted"
+                                            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                                            : "text-foreground/60 hover:text-foreground hover:bg-muted"
                                             }`}
                                     >
                                         <Icon className="size-4" />

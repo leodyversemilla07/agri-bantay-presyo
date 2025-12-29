@@ -5,12 +5,12 @@ from datetime import date
 
 class PriceService:
     @staticmethod
-    def get_latest_prices(db: Session, limit: int = 100):
+    def get_latest_prices(db: Session, skip: int = 0, limit: int = 100):
         from app.models.price_entry import PriceEntry
         return db.query(PriceEntry).options(
             joinedload(PriceEntry.commodity),
             joinedload(PriceEntry.market)
-        ).order_by(desc(PriceEntry.report_date)).limit(limit).all()
+        ).order_by(desc(PriceEntry.report_date)).offset(skip).limit(limit).all()
 
     @staticmethod
     def get_prices_by_date(db: Session, report_date: date):

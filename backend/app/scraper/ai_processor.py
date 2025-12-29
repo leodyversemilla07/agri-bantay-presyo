@@ -49,10 +49,11 @@ class AIProcessor:
            - "Rice" category includes all rice variants. "Meat" includes Pork/Beef. "Fish" includes Bangus/Tilapia.
         
         3. **FIELDS**: 
-           - Entry: {{"commodity": string, "category": string, "unit": string, "price_low": number, "price_high": number, "price_prevailing": number}}
+        - Entry: {{"commodity": string, "category": string, "unit": string, "price_low": number, "price_high": number, "price_prevailing": number, "price_average": number}}
         
-        4. **CLEANING**:
+        4. **CLEANING & UNITS**:
            - "Beef Brisket, Local" -> "Beef Brisket" (if that matches master list).
+           - The unit is often not in a column but in the category header like "RICE (per kg)". Ensure the "unit" field is populated (e.g., "kg", "piece", "bottle").
            - Remove dangling commas or trailing abbreviations like "(Imp.)" if they are already integrated into the master name.
         
         5. Return ONLY a valid JSON array.

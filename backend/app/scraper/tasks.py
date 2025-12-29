@@ -49,9 +49,10 @@ def scrape_daily_prices(url: str):
                 "commodity_id": commodity.id,
                 "market_id": market.id,
                 "report_date": entry["report_date"],
-                "price_low": entry["price_low"],
-                "price_high": entry["price_high"],
-                "price_prevailing": entry["price_prevailing"],
+                "price_low": entry.get("price_low"),
+                "price_high": entry.get("price_high"),
+                "price_prevailing": entry.get("price_prevailing"),
+                "price_average": entry.get("price_average"),
                 "report_type": entry["report_type"],
                 "source_file": pdf_path.name
             })

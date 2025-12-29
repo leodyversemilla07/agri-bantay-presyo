@@ -7,12 +7,16 @@ from app.services.market_service import MarketService
 
 router = APIRouter()
 
-@router.get("/")
-def read_markets(db: Session = Depends(get_db), skip: int = 0, limit: int = 100):
-    from app.models.market import Market
-    markets = db.query(Market).offset(skip).limit(limit).all()
-    # Explicit conversion to list of dicts to avoid lazy evaluation issues during JSON serialization
-    return [{"id": m.id, "name": m.name, "region": m.region, "city": m.city, "is_regional_average": m.is_regional_average} for m in markets]
+from app.api.deps import PaginationParams, get_pagination_params
+
+@router.get("/", response_model=List[Market])
+def read_markets(
+    db: Session = Depends(get_db), 
+    pagination: PaginationParams = Depends(get_pagination_params)
+):
+    from app.models.market import Market as MarketModel
+    markets = db.query(MarketModel).offset(pagination.skip).limit(pagination.limit).all()
+    return markets
 
 @router.post("/", response_model=Market)
 def create_market(market_in: MarketCreate, db: Session = Depends(get_db)):
