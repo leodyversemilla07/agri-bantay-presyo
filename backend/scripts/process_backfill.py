@@ -5,14 +5,20 @@ import os
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict
+import sys
+
+# Add parent directory to sys.path to allow imports from 'app'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.scraper.downloader import PDFDownloader
 from app.scraper.parser import PriceParser
-# Import models to ensure they are registered with SQLAlchemy
-from app.models.commodity import Commodity
-from app.models.market import Market
-from app.models.price_entry import PriceEntry
-from app.models.supply_index import SupplyIndex
+
+# Fix model initialization: Register all models first
+from app.db import base
+from sqlalchemy.orm import configure_mappers
+configure_mappers()
+
+from app.models import Commodity, Market, PriceEntry, SupplyIndex
 from app.services.price_service import PriceService
 from app.services.commodity_service import CommodityService
 from app.services.market_service import MarketService
@@ -29,8 +35,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-QUEUE_FILE = "backfill_queue.json"
-PROCESSED_FILE = "processed_files.json"
+QUEUE_FILE = os.path.join("data", "filtered_da_retail_prices.json")
+PROCESSED_FILE = os.path.join("data", "processed_files.json")
 
 def load_processed() -> List[str]:
     if Path(PROCESSED_FILE).exists():
@@ -115,16 +121,14 @@ async def main():
     processed = load_processed()
     processed_urls = set(processed)
     
-    # Sort: Oldest first? User said "oldest ... up to present"
-    # The queue was sorted newest first (reverse=True) in fetch_all_links
-    # Let's reverse it to process oldest first
-    queue.reverse()
+    # Queue is already sorted Oldest -> Newest by fetch_all_links.py
+    # queue.reverse() 
     
     db = SessionLocal()
     
     try:
         count = 0
-        limit = 5 # Safety limit for first run
+        limit = 2000 # Set to high number to process all links
         
         for entry in queue:
             if count >= limit:

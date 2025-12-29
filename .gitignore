@@ -163,3 +163,4 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+backend/data/

@@ -1,14 +1,25 @@
+import os
+import sys
+
+# Add parent directory to sys.path to allow imports from 'app'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.db.session import SessionLocal
 from app.db import base
 from app.models.price_entry import PriceEntry
+from app.models.supply_index import SupplyIndex
+from app.models.market import Market
 from app.models.commodity import Commodity
 from sqlalchemy import delete
 
 def wipe_data():
     db = SessionLocal()
     try:
-        print("Wiping all price entries and commodities for a clean start...")
+        print("Wiping all entries for a clean start...")
+        # Order matters for foreign keys
         db.query(PriceEntry).delete()
+        db.query(SupplyIndex).delete()
+        db.query(Market).delete()
         db.query(Commodity).delete()
         db.commit()
         print("Successfully wiped database.")

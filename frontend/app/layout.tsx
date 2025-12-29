@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { Navbar } from "@/components/navbar"
 import "./globals.css"
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -17,9 +18,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Agri Bantay Presyo - Agricultural Price Monitoring System",
+  title: "Agri Bantay Presyo - Agricultural Price Monitoring",
   description:
-    "Official agricultural price monitoring system for Philippine farm commodities. Track real-time market prices for rice, vegetables, meat, fish, and more.",
+    "An independent, community-driven agricultural price monitoring project for Philippine farm commodities. Track real-time market trends and historical data.",
   generator: "v0.app",
 }
 
@@ -30,7 +31,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${plusJakarta.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body className={`${plusJakarta.variable} ${geistMono.variable} font-sans antialiased text-foreground bg-background`}>
+        <Navbar />
         {children}
         <Analytics />
       </body>
