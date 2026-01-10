@@ -9,6 +9,7 @@ from app.services.market_service import MarketService
 from app.schemas.commodity import CommodityCreate
 from app.schemas.market import MarketCreate
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ def scrape_daily_prices(url: str):
     downloader = PDFDownloader()
     parser = PriceParser()
     db = SessionLocal()
+    pdf_path = None
     
     try:
         logger.info(f"Starting daily scrape for URL: {url}")
@@ -58,6 +60,11 @@ def scrape_daily_prices(url: str):
             })
             
         logger.info(f"Successfully processed {len(parsed_results)} entries from {pdf_path.name}")
+        
+        # Clean up: Delete the PDF after successful processing
+        if pdf_path and pdf_path.exists():
+            os.remove(pdf_path)
+            logger.info(f"Cleaned up downloaded file: {pdf_path.name}")
         
     except Exception as e:
         logger.error(f"Scraping failed: {e}")

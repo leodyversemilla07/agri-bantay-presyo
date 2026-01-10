@@ -178,16 +178,18 @@ endblock %} {% block content %}
               <td class="py-4 px-6">
                 <div class="flex items-center gap-3">
                   <div
-                    class="size-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"
+                    class="size-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    :class="getCategoryStyle(price.category).bg"
                   >
-                    <i data-lucide="wheat" class="size-5 text-primary"></i>
+                    <i :data-lucide="getCategoryIcon(price.category)" class="size-5" :class="getCategoryStyle(price.category).text"></i>
                   </div>
                   <span class="font-bold" x-text="price.commodity_name"></span>
                 </div>
               </td>
               <td class="py-4 px-6">
                 <span
-                  class="px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold"
+                  class="px-3 py-1 rounded-full text-xs font-bold"
+                  :class="getCategoryStyle(price.category).badge"
                   x-text="price.category"
                 ></span>
               </td>
@@ -285,10 +287,52 @@ endblock %} {% block content %}
               if (!dateStr) return '-';
               const date = new Date(dateStr);
               return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          },
+
+          getCategoryIcon(category) {
+              const icons = {
+                  'Rice': 'wheat',
+                  'Corn': 'wheat',
+                  'Fish': 'fish',
+                  'Meat': 'beef',
+                  'Poultry': 'egg',
+                  'Vegetables': 'carrot',
+                  'Fruits': 'apple',
+                  'Spices': 'flame',
+                  'Other': 'package',
+                  'Highland Vegetables': 'mountain',
+                  'Lowland Vegetables': 'leaf'
+              };
+              return icons[category] || 'circle';
+          },
+
+          getCategoryStyle(category) {
+              const styles = {
+                  'Rice': { bg: 'bg-amber-500/10', text: 'text-amber-500', badge: 'bg-amber-500/10 text-amber-500' },
+                  'Corn': { bg: 'bg-yellow-500/10', text: 'text-yellow-500', badge: 'bg-yellow-500/10 text-yellow-500' },
+                  'Fish': { bg: 'bg-blue-500/10', text: 'text-blue-500', badge: 'bg-blue-500/10 text-blue-500' },
+                  'Meat': { bg: 'bg-red-500/10', text: 'text-red-500', badge: 'bg-red-500/10 text-red-500' },
+                  'Poultry': { bg: 'bg-orange-500/10', text: 'text-orange-500', badge: 'bg-orange-500/10 text-orange-500' },
+                  'Vegetables': { bg: 'bg-green-500/10', text: 'text-green-500', badge: 'bg-green-500/10 text-green-500' },
+                  'Fruits': { bg: 'bg-pink-500/10', text: 'text-pink-500', badge: 'bg-pink-500/10 text-pink-500' },
+                  'Spices': { bg: 'bg-rose-500/10', text: 'text-rose-500', badge: 'bg-rose-500/10 text-rose-500' },
+                  'Other': { bg: 'bg-slate-500/10', text: 'text-slate-500', badge: 'bg-slate-500/10 text-slate-500' },
+                  'Highland Vegetables': { bg: 'bg-emerald-500/10', text: 'text-emerald-500', badge: 'bg-emerald-500/10 text-emerald-500' },
+                  'Lowland Vegetables': { bg: 'bg-lime-500/10', text: 'text-lime-500', badge: 'bg-lime-500/10 text-lime-500' }
+              };
+              return styles[category] || { bg: 'bg-primary/10', text: 'text-primary', badge: 'bg-primary/10 text-primary' };
           }
       }
   }
 
+  // Re-initialize Lucide icons after Alpine renders
+  document.addEventListener('alpine:initialized', () => {
+      setTimeout(() => lucide.createIcons(), 100);
+  });
+  
+  // Also re-initialize when data changes
+  setInterval(() => lucide.createIcons(), 500);
+  
   lucide.createIcons();
 </script>
 {% endblock %}

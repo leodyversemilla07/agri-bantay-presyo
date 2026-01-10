@@ -17,20 +17,50 @@ services:
     ports:
       - "6379:6379"
 
-  # Backend API
-  backend:
+  # FastAPI Application
+  app:
     build: .
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/bantay_presyo
       - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - db
       - redis
     volumes:
       - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker for background tasks
+  celery-worker:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/bantay_presyo
+      - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+    command: celery -A app.core.celery_app worker --loglevel=info
+
+  # Celery Beat for scheduled tasks
+  celery-beat:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/bantay_presyo
+      - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - db
+      - redis
+      - celery-worker
+    volumes:
+      - .:/app
+    command: celery -A app.core.celery_app beat --loglevel=info
 
 volumes:
   postgres_data:

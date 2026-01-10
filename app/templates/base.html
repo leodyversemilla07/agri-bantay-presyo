@@ -1,9 +1,22 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
+    <!-- Theme initialization (prevents flash) -->
+    <script>
+      if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Agri Bantay Presyo{% endblock %}</title>
+
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,6 +25,9 @@
         darkMode: "class",
         theme: {
           extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            },
             colors: {
               primary: "#22c55e",
               background: "#0a0a0a",
@@ -41,18 +57,27 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 
     <style>
+      /* Light mode (default) */
       body {
+        background-color: #f8fafc;
+        color: #1e293b;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      /* Dark mode */
+      .dark body {
         background-color: #0a0a0a;
         color: #fafafa;
-        font-family:
-          system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          Roboto,
-          sans-serif;
       }
       .glass-card {
+        background: linear-gradient(
+          135deg,
+          rgba(241, 245, 249, 0.8) 0%,
+          rgba(241, 245, 249, 0.4) 100%
+        );
+        transition: background 0.3s ease;
+      }
+      .dark .glass-card {
         background: linear-gradient(
           135deg,
           rgba(23, 23, 23, 0.8) 0%,
@@ -80,10 +105,10 @@
     </style>
     {% block head %}{% endblock %}
   </head>
-  <body class="min-h-screen bg-background" x-data="{ mobileMenuOpen: false }">
+  <body class="min-h-screen bg-slate-50 dark:bg-background transition-colors duration-300" x-data="{ mobileMenuOpen: false, darkMode: localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches) }">
     <!-- Navigation -->
     <nav
-      class="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl"
+      class="sticky top-0 z-50 border-b border-slate-200 dark:border-border/50 bg-white/80 dark:bg-background/80 backdrop-blur-xl transition-colors duration-300"
     >
       <div class="container mx-auto px-4">
         <div class="flex h-16 items-center justify-between">
@@ -101,46 +126,58 @@
           <div class="hidden md:flex items-center gap-6">
             <a
               href="/"
-              class="text-sm font-bold text-foreground/60 hover:text-primary transition-colors"
+              class="text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary transition-colors"
               >Overview</a
             >
             <a
               href="/markets"
-              class="text-sm font-bold text-foreground/60 hover:text-primary transition-colors"
+              class="text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary transition-colors"
               >Markets</a
             >
             <a
               href="/analytics"
-              class="text-sm font-bold text-foreground/60 hover:text-primary transition-colors"
+              class="text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary transition-colors"
               >Analytics</a
             >
             <a
-              href="/api/v1/docs"
+              href="/docs"
               target="_blank"
-              class="text-sm font-bold text-foreground/60 hover:text-primary transition-colors"
+              class="text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary transition-colors"
               >API</a
             >
           </div>
 
-          <!-- Search -->
-          <form
-            action="/markets"
-            method="get"
-            class="hidden md:flex items-center"
-          >
-            <div class="relative">
-              <i
-                data-lucide="search"
-                class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted"
-              ></i>
-              <input
-                type="text"
-                name="q"
-                placeholder="Search commodities..."
-                class="pl-10 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:border-primary w-48 transition-all"
-              />
-            </div>
-          </form>
+          <!-- Search & Theme Toggle -->
+          <div class="hidden md:flex items-center gap-2">
+            <form
+              action="/markets"
+              method="get"
+              class="flex items-center"
+            >
+              <div class="relative">
+                <i
+                  data-lucide="search"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted"
+                ></i>
+                <input
+                  type="text"
+                  name="q"
+                  placeholder="Search commodities..."
+                  class="pl-10 pr-4 py-2 bg-white dark:bg-card border border-slate-200 dark:border-border rounded-lg text-sm focus:outline-none focus:border-primary w-48 transition-all text-slate-800 dark:text-foreground"
+                />
+              </div>
+            </form>
+
+            <!-- Theme Toggle -->
+            <button
+              @click="darkMode = !darkMode; localStorage.theme = darkMode ? 'dark' : 'light'; document.documentElement.classList.toggle('dark', darkMode)"
+              class="p-2 rounded-lg bg-slate-100 dark:bg-card hover:bg-slate-200 dark:hover:bg-border transition-colors"
+              :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+            >
+              <i x-show="!darkMode" data-lucide="moon" class="size-5 text-slate-600"></i>
+              <i x-show="darkMode" data-lucide="sun" class="size-5 text-yellow-400"></i>
+            </button>
+          </div>
 
           <button
             @click="mobileMenuOpen = !mobileMenuOpen"
@@ -155,27 +192,27 @@
       <div
         x-show="mobileMenuOpen"
         x-transition
-        class="md:hidden border-t border-border/50 bg-background"
+        class="md:hidden border-t border-slate-200 dark:border-border/50 bg-white dark:bg-background transition-colors duration-300"
       >
         <div class="container mx-auto px-4 py-4 space-y-2">
           <a
             href="/"
-            class="block py-2 text-sm font-bold text-foreground/60 hover:text-primary"
+            class="block py-2 text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary"
             >Overview</a
           >
           <a
             href="/markets"
-            class="block py-2 text-sm font-bold text-foreground/60 hover:text-primary"
+            class="block py-2 text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary"
             >Markets</a
           >
           <a
             href="/analytics"
-            class="block py-2 text-sm font-bold text-foreground/60 hover:text-primary"
+            class="block py-2 text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary"
             >Analytics</a
           >
           <a
-            href="/api/v1/docs"
-            class="block py-2 text-sm font-bold text-foreground/60 hover:text-primary"
+            href="/docs"
+            class="block py-2 text-sm font-bold text-slate-600 dark:text-foreground/60 hover:text-primary"
             >API</a
           >
         </div>
@@ -186,19 +223,19 @@
     <main>{% block content %}{% endblock %}</main>
 
     <!-- Footer -->
-    <footer class="border-t border-border/50 mt-20 py-8">
+    <footer class="border-t border-slate-200 dark:border-border/50 mt-20 py-8 bg-white dark:bg-background transition-colors duration-300">
       <div class="container mx-auto px-4">
         <div
           class="flex flex-col md:flex-row items-center justify-between gap-4"
         >
-          <p class="text-sm text-muted">
+          <p class="text-sm text-slate-500 dark:text-muted">
             &copy; 2024 Agri Bantay Presyo. Data sourced from DA-AMAS.
           </p>
           <div class="flex items-center gap-4">
             <a
               href="https://github.com"
               target="_blank"
-              class="text-muted hover:text-primary transition-colors"
+              class="text-slate-500 dark:text-muted hover:text-primary transition-colors"
             >
               <i data-lucide="github" class="size-5"></i>
             </a>
