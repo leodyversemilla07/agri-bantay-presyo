@@ -14,8 +14,8 @@ class MonitoringSource:
     @staticmethod
     def get_latest_pdf_links() -> List[str]:
         """
-        Scrapes the DA monitoring page for latest Daily Retail Price PDF links.
-        Returns URLs for Price-Monitoring PDFs.
+        Scrapes the DA monitoring page for Daily Retail Price Range PDFs.
+        Only returns Price-Monitoring PDFs (not Daily-Price-Index or Cigarette).
         """
         try:
             headers = {
@@ -33,19 +33,14 @@ class MonitoringSource:
             pdf_urls = []
             for link in links:
                 url = link.get("href")
-                text = link.get_text().lower()
                 url_lower = url.lower()
 
-                # Match Price-Monitoring PDFs (the actual naming convention)
-                if (
-                    "price-monitoring" in url_lower
-                    or "price monitoring" in text
-                    or "dpi" in text
-                    or "daily-price-index" in url_lower
-                    or "daily prevailing" in text
-                ):
-                    pdf_urls.append(url)
-                    logger.info(f"Found PDF: {url}")
+                # Only match "Price-Monitoring" PDFs (Daily Retail Price Range)
+                # Exclude Daily-Price-Index and Cigarette monitoring
+                if "price-monitoring" in url_lower:
+                    if "daily-price-index" not in url_lower and "cigarette" not in url_lower:
+                        pdf_urls.append(url)
+                        logger.info(f"Found PDF: {url}")
 
             logger.info(f"Total PDFs found: {len(pdf_urls)}")
             return pdf_urls
