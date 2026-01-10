@@ -1,0 +1,350 @@
+{% extends "base.html" %} {% block title %}Analytics - Agri Bantay Presyo{%
+endblock %} {% block content %}
+<!-- Price Ticker -->
+<div class="border-b border-border/50 bg-card/50 py-3 overflow-hidden">
+  <div class="ticker-scroll flex gap-8 whitespace-nowrap">
+    {% for item in ticker_items %}
+    <div class="flex items-center gap-2 px-4">
+      <span class="font-bold">{{ item.name }}</span>
+      <span class="text-primary font-black"
+        >₱{{ "%.2f"|format(item.price) }}</span
+      >
+      {% if item.change >= 0 %}
+      <span class="text-emerald-500 text-sm"
+        >▲ {{ "%.1f"|format(item.change) }}%</span
+      >
+      {% else %}
+      <span class="text-red-500 text-sm"
+        >▼ {{ "%.1f"|format(item.change|abs) }}%</span
+      >
+      {% endif %}
+    </div>
+    {% endfor %} {% for item in ticker_items %}
+    <div class="flex items-center gap-2 px-4">
+      <span class="font-bold">{{ item.name }}</span>
+      <span class="text-primary font-black"
+        >₱{{ "%.2f"|format(item.price) }}</span
+      >
+      {% if item.change >= 0 %}
+      <span class="text-emerald-500 text-sm"
+        >▲ {{ "%.1f"|format(item.change) }}%</span
+      >
+      {% else %}
+      <span class="text-red-500 text-sm"
+        >▼ {{ "%.1f"|format(item.change|abs) }}%</span
+      >
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="container mx-auto px-4 py-8 space-y-8" x-data="analyticsPage()">
+  <!-- Header -->
+  <header class="space-y-4">
+    <div
+      class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 text-[10px] font-black uppercase tracking-widest border border-blue-500/20"
+    >
+      <i data-lucide="bar-chart-3" class="size-3"></i>
+      Advanced Analytics
+    </div>
+
+    <div
+      class="flex flex-col md:flex-row md:items-center justify-between gap-6"
+    >
+      <div class="space-y-1">
+        <h1 class="text-4xl font-black tracking-tighter">
+          Deep <span class="text-primary italic">Trends</span>
+        </h1>
+        <p class="text-muted font-bold">
+          Visualizing market volatility and historical price movements.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <i
+            data-lucide="search"
+            class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted pointer-events-none"
+          ></i>
+          <select
+            x-model="selectedCommodity"
+            @change="loadChartData()"
+            class="h-11 pl-10 pr-10 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none min-w-[200px]"
+          >
+            {% for commodity in commodities %}
+            <option value="{{ commodity.id }}">{{ commodity.name }}</option>
+            {% endfor %}
+          </select>
+          <i
+            data-lucide="chevron-down"
+            class="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted pointer-events-none"
+          ></i>
+        </div>
+
+        <select
+          x-model="dateRange"
+          @change="loadChartData()"
+          class="h-11 px-4 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        >
+          <option value="7">Last 7 Days</option>
+          <option value="30">Last 30 Days</option>
+          <option value="90">Last 3 Months</option>
+          <option value="365">Full Year</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats Cards -->
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="glass-card rounded-2xl p-6 ring-1 ring-white/10">
+      <div class="flex items-center justify-between mb-4">
+        <div
+          class="size-12 rounded-xl bg-primary/10 flex items-center justify-center"
+        >
+          <i data-lucide="package" class="size-6 text-primary"></i>
+        </div>
+      </div>
+      <p class="text-sm font-bold text-muted uppercase tracking-widest mb-1">
+        Commodities
+      </p>
+      <p class="text-4xl font-black tracking-tighter">
+        {{ stats.commodities.count }}
+      </p>
+    </div>
+
+    <div class="glass-card rounded-2xl p-6 ring-1 ring-white/10">
+      <div class="flex items-center justify-between mb-4">
+        <div
+          class="size-12 rounded-xl bg-blue-500/10 flex items-center justify-center"
+        >
+          <i data-lucide="store" class="size-6 text-blue-500"></i>
+        </div>
+      </div>
+      <p class="text-sm font-bold text-muted uppercase tracking-widest mb-1">
+        Markets
+      </p>
+      <p class="text-4xl font-black tracking-tighter">
+        {{ stats.markets.count }}
+      </p>
+    </div>
+
+    <div class="glass-card rounded-2xl p-6 ring-1 ring-white/10">
+      <div class="flex items-center justify-between mb-4">
+        <div
+          class="size-12 rounded-xl bg-amber-500/10 flex items-center justify-center"
+        >
+          <i data-lucide="database" class="size-6 text-amber-500"></i>
+        </div>
+      </div>
+      <p class="text-sm font-bold text-muted uppercase tracking-widest mb-1">
+        Price Entries
+      </p>
+      <p class="text-4xl font-black tracking-tighter">
+        {{ "{:,}".format(stats.prices.count) }}
+      </p>
+    </div>
+  </section>
+
+  <!-- Charts -->
+  <section class="grid gap-6 lg:grid-cols-2">
+    <!-- Price Chart -->
+    <div class="space-y-4">
+      <div class="flex items-center gap-3 px-2">
+        <div
+          class="size-10 rounded-xl bg-primary/10 flex items-center justify-center"
+        >
+          <i data-lucide="trending-up" class="size-5 text-primary"></i>
+        </div>
+        <div>
+          <h3
+            class="font-black tracking-tight"
+            x-text="selectedCommodityName + ' Price Trail'"
+          >
+            Price Trail
+          </h3>
+          <p
+            class="text-[10px] font-black uppercase text-muted tracking-widest"
+          >
+            Primary prevailing indices
+          </p>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-6 ring-1 ring-white/10">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <span
+              class="px-2 py-0.5 rounded-full bg-primary/10 text-[10px] font-bold text-primary uppercase"
+              >Pricing</span
+            >
+          </div>
+          <div class="text-right">
+            <p
+              class="text-3xl font-black tracking-tighter"
+              x-text="'₱' + currentPrice.toFixed(2)"
+            ></p>
+            <span
+              class="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full"
+              >LIVE TRACKING</span
+            >
+          </div>
+        </div>
+        <div class="h-[300px]">
+          <canvas id="priceChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Volume Chart -->
+    <div class="space-y-4">
+      <div class="flex items-center gap-3 px-2">
+        <div
+          class="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center"
+        >
+          <i data-lucide="bar-chart-3" class="size-5 text-blue-500"></i>
+        </div>
+        <div>
+          <h3 class="font-black tracking-tight">Market Range Analysis</h3>
+          <p
+            class="text-[10px] font-black uppercase text-muted tracking-widest"
+          >
+            High vs Low Volatility
+          </p>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-6 ring-1 ring-white/10">
+        <div class="flex items-center justify-between mb-4">
+          <span
+            class="px-2 py-0.5 rounded-full bg-blue-500/10 text-[10px] font-bold text-blue-500 uppercase"
+            >Range</span
+          >
+        </div>
+        <div class="h-[300px]">
+          <canvas id="rangeChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  let priceChart = null;
+  let rangeChart = null;
+
+  function analyticsPage() {
+      return {
+          commodities: {{ commodities_json|safe }},
+          selectedCommodity: '{{ default_commodity_id }}',
+          dateRange: '30',
+          chartData: {{ chart_data_json|safe }},
+          currentPrice: {{ current_price }},
+
+          get selectedCommodityName() {
+              const comm = this.commodities.find(c => c.id === this.selectedCommodity);
+              return comm ? comm.name : 'Commodity';
+          },
+
+          async loadChartData() {
+              try {
+                  const response = await fetch(`/api/v1/trends/history/${this.selectedCommodity}?limit=${this.dateRange}`);
+                  const data = await response.json();
+
+                  this.chartData = data.reverse().map(d => ({
+                      date: new Date(d.report_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                      price: d.price_prevailing || d.price_average || 0,
+                      low: d.price_low || 0,
+                      high: d.price_high || 0
+                  }));
+
+                  if (this.chartData.length > 0) {
+                      this.currentPrice = this.chartData[this.chartData.length - 1].price;
+                  }
+
+                  this.updateCharts();
+              } catch (e) {
+                  console.error('Failed to load chart data', e);
+              }
+          },
+
+          updateCharts() {
+              // Price Chart
+              if (priceChart) priceChart.destroy();
+              const priceCtx = document.getElementById('priceChart').getContext('2d');
+              const gradient = priceCtx.createLinearGradient(0, 0, 0, 300);
+              gradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
+              gradient.addColorStop(1, 'rgba(34, 197, 94, 0)');
+
+              priceChart = new Chart(priceCtx, {
+                  type: 'line',
+                  data: {
+                      labels: this.chartData.map(d => d.date),
+                      datasets: [{
+                          label: 'Price (₱)',
+                          data: this.chartData.map(d => d.price),
+                          borderColor: '#22c55e',
+                          backgroundColor: gradient,
+                          borderWidth: 3,
+                          fill: true,
+                          tension: 0.4,
+                          pointRadius: 3,
+                          pointHoverRadius: 6
+                      }]
+                  },
+                  options: {
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { display: false } },
+                      scales: {
+                          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#a3a3a3', font: { weight: 'bold', size: 10 } } },
+                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#a3a3a3', callback: v => '₱' + v } }
+                      }
+                  }
+              });
+
+              // Range Chart
+              if (rangeChart) rangeChart.destroy();
+              const rangeCtx = document.getElementById('rangeChart').getContext('2d');
+
+              rangeChart = new Chart(rangeCtx, {
+                  type: 'bar',
+                  data: {
+                      labels: this.chartData.map(d => d.date),
+                      datasets: [
+                          {
+                              label: 'Low',
+                              data: this.chartData.map(d => d.low),
+                              backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                              borderRadius: 4
+                          },
+                          {
+                              label: 'High',
+                              data: this.chartData.map(d => d.high),
+                              backgroundColor: 'rgba(59, 130, 246, 1)',
+                              borderRadius: 4
+                          }
+                      ]
+                  },
+                  options: {
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { display: false } },
+                      scales: {
+                          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#a3a3a3', font: { weight: 'bold', size: 10 } } },
+                          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#a3a3a3', callback: v => '₱' + v } }
+                      }
+                  }
+              });
+          },
+
+          init() {
+              this.$nextTick(() => this.updateCharts());
+          }
+      }
+  }
+
+  lucide.createIcons();
+</script>
+{% endblock %}

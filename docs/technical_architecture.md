@@ -1,35 +1,44 @@
 # Technical Architecture & Scraper Logic
-**Project:** Agri Bantay Presyo
+**Project:** Agri Bantay Presyo (Daily Retail Price Monitoring)
 
-## Recommended Tech Stack (The "Agri-Stack")
-*   **Backend API:** FastAPI (Python) - High performance; async support for concurrent scraping.
-*   **Database:** PostgreSQL - Relational data (linking Commodities to Markets).
-*   **AI Engine:** Google Gemini 3 Flash Preview - For intelligent, schema-aware parsing of unstructured PDF tables.
-*   **Frontend:** Next.js (React) - Fast, client-side interactive dashboard.
+## Tech Stack
+*   **Backend API:** FastAPI (Python) - High performance; async support.
+*   **Database:** PostgreSQL - Relational data storage.
+*   **AI Engine:** Google Gemini Flash - For intelligent PDF table parsing.
+*   **Frontend:** Jinja2 Templates + Tailwind CSS + Alpine.js + HTMX.
 
 ## Scraper & Data Ingestion Logic
-1.  **Source Acquisition**: The system scrapes the Department of Agriculture website for "Price Watch" and "Daily Retail Price" PDF links.
-2.  **Queue Management**: Links are filtered and added to a processing queue (persisted in JSON) to track backfill progress.
+
+1.  **Source Acquisition**: The system scrapes the DA-AMAS website for Daily Retail Price Range PDF links.
+2.  **Queue Management**: Links are tracked to avoid duplicate processing.
 3.  **AI-Powered Parsing**:
-    *   PDF text is extracted using `pdfplumber` (giving better layout preservation).
-    *   Raw text is sent to **Google Gemini 3 Flash Preview** with a strict schema prompt.
-    *   Gemini returns a clean JSON array of pricing entries, handling column misalignments and layout changes automatically.
-4.  **Standardization**: Extracted names (e.g., "Red Onion", "Onion Red") are normalized to a canonical `Commodity` ID using a smart lookup strategy (Exact Match -> Category Match -> Partial Match).
-5.  **Persistence**: Validated data is upserted into the `PriceEntry` table, linked to `Commodity` and `Market` models.
-6.  **Historical Backfill**: A dedicated script (`process_backfill.py`) sequentially processes years of historical reports (2018-Present).
+    *   PDF text is extracted using `pdfplumber`.
+    *   Raw text is sent to **Google Gemini** with a structured prompt.
+    *   Gemini returns clean JSON with price ranges (low/high/prevailing).
+4.  **Persistence**: Data is upserted into the `PriceEntry` table.
+5.  **Automation**: Celery tasks run daily to check for new reports.
 
 ### Scraper Workflow Diagram
 
 ```mermaid
 graph TD
-    A[DA Website] -->|Scrape Links| B[Link Queue JSON]
+    A[DA-AMAS Website] -->|Scrape Links| B[Link Queue]
     B -->|Next URL| C{Processor}
     C -->|Download PDF| D[Raw PDF]
     D -->|pdfplumber| E[Raw Text]
-    E -->|Prompt Engineering| F[Google Gemini 3 Flash Preview]
-    F -->|Structure Data| G[JSON Response]
-    G -->|Clean & Map| H[Standardization Layer]
-    H -->|Link Models| I[Market/Commodity Lookup]
-    I -->|Upsert| J[(PostgreSQL Database)]
-    J -->|Query| K[FastAPI Backend]
+    E -->|Prompt Engineering| F[Google Gemini Flash]
+    F -->|Structured JSON| G[Price Data]
+    G -->|Upsert| H[(PostgreSQL)]
+    H -->|Query| I[FastAPI + Jinja2 UI]
 ```
+
+## What's Included
+- Daily Retail Price Range PDF parsing
+- Basic commodity/market storage
+- Interactive dashboard
+- REST API endpoints
+
+## What's NOT Included (v2.0)
+- Weekly Average PDF parsing
+- Supply Index tracking
+- Complex commodity standardization

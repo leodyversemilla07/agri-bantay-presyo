@@ -14,8 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-!frontend/lib/
+!lib/
 lib64/
 parts/
 sdist/
@@ -159,8 +158,11 @@ Thumbs.db
 
 # Logs
 *.log
+*.log.*
+ingestion_*.log
+backfill.log
 
 # Temporary files
 *.tmp
 *.temp
-backend/data/
+data/

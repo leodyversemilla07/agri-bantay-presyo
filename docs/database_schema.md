@@ -1,33 +1,30 @@
 # Database Schema
-**Project:** Agri Bantay Presyo
+**Project:** Agri Bantay Presyo (Daily Retail Price Monitoring)
 
-## Table A: commodities (The Standardizer)
+## Table A: commodities
 *   **id (PK):** UUID
-*   **name:** String (Standardized Name, e.g., "Red Onion")
-*   **category:** String (e.g., "Vegetables - Lowland", "Fish")
-*   **variant:** String (e.g., "Imported", "Local", "Medium Size")
-*   **unit:** String (e.g., "kg", "pc", "tray")
+*   **name:** String (e.g., "Red Onion", "Cabbage")
+*   **category:** String (e.g., "Vegetables", "Fish")
+*   **variant:** String (e.g., "Imported", "Local")
+*   **unit:** String (e.g., "kg", "pc")
 
-## Table B: markets (The Locations)
+## Table B: markets
 *   **id (PK):** UUID
 *   **name:** String (e.g., "Commonwealth Market")
 *   **region:** String (e.g., "NCR")
 *   **city:** String (e.g., "Quezon City")
 
-## Table C: price_entries (The Core Data)
+## Table C: price_entries (Daily Retail Prices)
 *   **id (PK):** UUID
 *   **commodity_id (FK):** Links to commodities
 *   **market_id (FK):** Links to markets
 *   **report_date:** Date
-*   **price_low:** Decimal
-*   **price_high:** Decimal
-*   **price_prevailing:** Decimal
-*   **report_type:** Enum ("DAILY_PREVAILING", "WEEKLY_AVERAGE")
-*   **source_file:** String (e.g., "Price-Monitoring-December-22-2025.pdf")
+*   **price_low:** Decimal (Low end of price range)
+*   **price_high:** Decimal (High end of price range)
+*   **price_prevailing:** Decimal (Calculated average or prevailing price)
+*   **report_type:** String ("DAILY_RETAIL")
+*   **source_file:** String (PDF filename)
 
-## Table D: supply_indices (The Context)
-*   **id (PK):** UUID
-*   **date:** Date
-*   **commodity_id (FK):** Links to commodities
-*   **volume_metric_tons:** Decimal
-*   **wholesale_price:** Decimal
+## Notes
+- Only Daily Retail Price Range data is stored.
+- `report_type` is always "DAILY_RETAIL".

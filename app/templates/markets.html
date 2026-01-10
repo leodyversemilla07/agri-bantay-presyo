@@ -1,0 +1,294 @@
+{% extends "base.html" %} {% block title %}Markets - Agri Bantay Presyo{%
+endblock %} {% block content %}
+<!-- Price Ticker -->
+<div class="border-b border-border/50 bg-card/50 py-3 overflow-hidden">
+  <div class="ticker-scroll flex gap-8 whitespace-nowrap">
+    {% for item in ticker_items %}
+    <div class="flex items-center gap-2 px-4">
+      <span class="font-bold">{{ item.name }}</span>
+      <span class="text-primary font-black"
+        >₱{{ "%.2f"|format(item.price) }}</span
+      >
+      {% if item.change >= 0 %}
+      <span class="text-emerald-500 text-sm"
+        >▲ {{ "%.1f"|format(item.change) }}%</span
+      >
+      {% else %}
+      <span class="text-red-500 text-sm"
+        >▼ {{ "%.1f"|format(item.change|abs) }}%</span
+      >
+      {% endif %}
+    </div>
+    {% endfor %} {% for item in ticker_items %}
+    <div class="flex items-center gap-2 px-4">
+      <span class="font-bold">{{ item.name }}</span>
+      <span class="text-primary font-black"
+        >₱{{ "%.2f"|format(item.price) }}</span
+      >
+      {% if item.change >= 0 %}
+      <span class="text-emerald-500 text-sm"
+        >▲ {{ "%.1f"|format(item.change) }}%</span
+      >
+      {% else %}
+      <span class="text-red-500 text-sm"
+        >▼ {{ "%.1f"|format(item.change|abs) }}%</span
+      >
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="container mx-auto px-4 py-8 space-y-8" x-data="marketHub()">
+  <!-- Header -->
+  <header class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div class="space-y-2">
+      <div
+        class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest border border-primary/20"
+      >
+        <i data-lucide="database" class="size-3"></i>
+        Live Repository
+      </div>
+      <h1 class="text-4xl font-black tracking-tighter">
+        Market <span class="text-primary italic">Hub</span>
+      </h1>
+      <p class="text-muted font-bold max-w-xl">
+        Filter through thousands of price entries collected from major trading
+        centers across the Philippines.
+      </p>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative">
+        <i
+          data-lucide="search"
+          class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted pointer-events-none"
+        ></i>
+        <input
+          type="text"
+          placeholder="Search commodities..."
+          x-model="searchQuery"
+          class="h-11 pl-10 pr-4 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 w-full md:w-64"
+        />
+      </div>
+
+      <select
+        x-model="selectedCategory"
+        class="h-11 px-4 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+      >
+        <option value="all">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}">{{ cat }}</option>
+        {% endfor %}
+      </select>
+
+      <select
+        x-model="selectedMarket"
+        class="h-11 px-4 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+      >
+        <option value="all">All Markets</option>
+        {% for market in markets %}
+        <option value="{{ market.id }}">{{ market.name }}</option>
+        {% endfor %}
+      </select>
+
+      <select
+        x-model="selectedRegion"
+        class="h-11 px-4 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+      >
+        <option value="all">All Regions</option>
+        {% for region in regions %}
+        <option value="{{ region }}">{{ region }}</option>
+        {% endfor %}
+      </select>
+
+      <div class="flex items-center gap-2">
+        <input
+          type="date"
+          x-model="dateFrom"
+          class="h-11 px-4 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+        <span class="text-muted text-sm">to</span>
+        <input
+          type="date"
+          x-model="dateTo"
+          class="h-11 px-4 rounded-xl border border-border bg-background font-bold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
+
+      <a
+        href="/api/v1/prices/export"
+        class="h-11 px-4 rounded-xl border border-border bg-background font-bold text-sm hover:bg-card transition-colors flex items-center gap-2"
+      >
+        <i data-lucide="download" class="size-4"></i>
+        Export CSV
+      </a>
+    </div>
+  </header>
+
+  <!-- Data Table -->
+  <div class="glass-card rounded-2xl ring-1 ring-white/10 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-border/50 bg-card/50">
+            <th
+              class="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-muted"
+            >
+              Commodity
+            </th>
+            <th
+              class="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-muted"
+            >
+              Category
+            </th>
+            <th
+              class="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-muted"
+            >
+              Market
+            </th>
+            <th
+              class="text-right py-4 px-6 text-xs font-black uppercase tracking-widest text-muted"
+            >
+              Low
+            </th>
+            <th
+              class="text-right py-4 px-6 text-xs font-black uppercase tracking-widest text-muted"
+            >
+              High
+            </th>
+            <th
+              class="text-right py-4 px-6 text-xs font-black uppercase tracking-widest text-muted"
+            >
+              Prevailing
+            </th>
+            <th
+              class="text-right py-4 px-6 text-xs font-black uppercase tracking-widest text-muted"
+            >
+              Date
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="price in filteredPrices" :key="price.id">
+            <tr
+              class="border-b border-border/30 hover:bg-card/50 transition-colors"
+            >
+              <td class="py-4 px-6">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="size-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"
+                  >
+                    <i data-lucide="wheat" class="size-5 text-primary"></i>
+                  </div>
+                  <span class="font-bold" x-text="price.commodity_name"></span>
+                </div>
+              </td>
+              <td class="py-4 px-6">
+                <span
+                  class="px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold"
+                  x-text="price.category"
+                ></span>
+              </td>
+              <td
+                class="py-4 px-6 text-muted font-bold"
+                x-text="price.market_name"
+              ></td>
+              <td
+                class="py-4 px-6 text-right font-bold text-muted"
+                x-text="'₱' + (price.price_low || '-').toLocaleString()"
+              ></td>
+              <td
+                class="py-4 px-6 text-right font-bold text-muted"
+                x-text="'₱' + (price.price_high || '-').toLocaleString()"
+              ></td>
+              <td class="py-4 px-6 text-right">
+                <span
+                  class="font-black text-primary text-lg"
+                  x-text="'₱' + (price.price_prevailing || price.price_average || 0).toFixed(2)"
+                ></span>
+              </td>
+              <td
+                class="py-4 px-6 text-right text-muted text-sm font-bold"
+                x-text="formatDate(price.report_date)"
+              ></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="filteredPrices.length === 0" class="py-16 text-center">
+      <div
+        class="size-16 rounded-2xl bg-muted/10 flex items-center justify-center mx-auto mb-4"
+      >
+        <i data-lucide="search-x" class="size-8 text-muted"></i>
+      </div>
+      <h3 class="font-bold text-lg">No results found</h3>
+      <p class="text-muted text-sm mt-1">
+        Try adjusting your filters or search query.
+      </p>
+    </div>
+
+    <!-- Pagination -->
+    <div
+      class="flex items-center justify-between px-6 py-4 border-t border-border/30"
+    >
+      <p class="text-sm text-muted font-bold">
+        Showing <span x-text="filteredPrices.length"></span> of
+        <span x-text="prices.length"></span> entries
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  function marketHub() {
+      return {
+          prices: {{ prices_json|safe }},
+          searchQuery: '{{ search_query }}' || '',
+          selectedCategory: 'all',
+          selectedMarket: 'all',
+          selectedRegion: 'all',
+          dateFrom: '',
+          dateTo: '',
+
+          get filteredPrices() {
+              return this.prices.filter(p => {
+                  const matchesSearch = !this.searchQuery ||
+                      p.commodity_name.toLowerCase().includes(this.searchQuery.toLowerCase());
+                  const matchesCategory = this.selectedCategory === 'all' ||
+                      p.category === this.selectedCategory;
+                  const matchesMarket = this.selectedMarket === 'all' ||
+                      p.market_id === this.selectedMarket;
+                  const matchesRegion = this.selectedRegion === 'all' ||
+                      p.market_region === this.selectedRegion;
+
+                  let matchesDate = true;
+                  if (p.report_date) {
+                      const priceDate = new Date(p.report_date);
+                      if (this.dateFrom) {
+                          matchesDate = matchesDate && priceDate >= new Date(this.dateFrom);
+                      }
+                      if (this.dateTo) {
+                          matchesDate = matchesDate && priceDate <= new Date(this.dateTo);
+                      }
+                  }
+
+                  return matchesSearch && matchesCategory && matchesMarket && matchesRegion && matchesDate;
+              });
+          },
+
+          formatDate(dateStr) {
+              if (!dateStr) return '-';
+              const date = new Date(dateStr);
+              return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          }
+      }
+  }
+
+  lucide.createIcons();
+</script>
+{% endblock %}

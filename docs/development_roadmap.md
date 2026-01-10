@@ -1,26 +1,30 @@
 # Development Roadmap
-**Project:** Agri Bantay Presyo
+**Project:** Agri Bantay Presyo (Daily Retail Price Monitoring)
 
-## Phase 1: Foundation & "Hello World" Prototype
-*   [ ] Set up FastAPI project structure with PostgreSQL connection.
-*   [ ] Create basic PDF Scraper for one document type (e.g., Daily Prevailing).
-*   [ ] Implement "Spatial Table Extraction" using `pdfplumber`.
-*   [ ] Verify data extraction accuracy (parsing tabular data correctly).
+## Phase 1: Foundation & Prototype ✅ DONE
+*   [x] Set up FastAPI project structure with PostgreSQL connection.
+*   [x] Create PDF Scraper for Daily Retail Price Range.
+*   [x] Implement "Spatial Table Extraction" using `pdfplumber`.
+*   [x] Verify data extraction accuracy (parsing tabular data correctly).
 
-## Phase 2: Core Backend & Database
-*   [ ] Implement full Database Schema (Commodities, Markets, PriceEntries).
-*   [ ] Expand Scraper to handle Weekly Average and Supply Index PDFs.
-*   [ ] Build `map.json` for commodity standardization.
-*   [ ] Develop API endpoints (`/prices`, `/commodities`).
+## Phase 2: Core Backend & Database ✅ DONE
+*   [x] Implement Database Schema (Commodities, Markets, PriceEntries).
+*   [x] Build API endpoints (`/prices`, `/commodities`, `/markets`).
+*   [x] Connect scraper to database.
 
-## Phase 3: Frontend Development (Next.js)
-*   [ ] Initialize Next.js project with a mobile-first design system.
-*   [ ] Build "Price Ticker" and "Commodity Search" components.
-*   [ ] Integrate Charting library (e.g., Recharts) for trend visualization.
-*   [ ] Connect Frontend to Backend API.
+## Phase 3: Frontend Dashboard ✅ DONE (Jinja2)
+*   [x] Build Jinja2 templates with Tailwind CSS.
+*   [x] Implement Price Ticker component.
+*   [x] Build Commodity Search and Market Filters.
+*   [x] Integrate Chart.js for trend visualization.
 
-## Phase 4: Automation & Deployment
-*   [ ] Configure Celery + Redis for scheduled daily scraping tasks.
-*   [ ] Deploy Backend and Database (e.g., Heroku, Railway, or VPS).
-*   [ ] Deploy Frontend (e.g., Vercel).
-*   [ ] Setup monitoring for scraper failures (since PDF formats change).
+## Phase 4: Automation & Monitoring
+*   [x] Configure Celery + Redis for scheduled scraping.
+*   [ ] Setup monitoring for scraper failures (PDF format changes).
+*   [ ] Deploy to production.
+
+## Future Enhancements (Backlog)
+*   [ ] CSV/Excel export functionality
+*   [ ] Price change alerts/notifications
+*   [ ] Regional price comparison
+*   [ ] Mobile app
