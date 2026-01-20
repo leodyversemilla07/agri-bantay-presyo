@@ -1,10 +1,12 @@
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Agri Bantay Presyo"
     API_V1_STR: str = "/api/v1"
-    
+
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "password"
@@ -23,7 +25,8 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
         env_file_encoding = "utf-8"
-        extra = "ignore" # Allow extra env vars
+        extra = "ignore"  # Allow extra env vars
+
 
 # Create settings instance and explicitly load .env if necessary
 settings = Settings()

@@ -1,6 +1,8 @@
-from sqlalchemy import Column, String, UUID, Date, Numeric, ForeignKey
-from sqlalchemy.orm import relationship
 import uuid
+
+from sqlalchemy import UUID, Column, Date, ForeignKey, Numeric, String
+from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
 
 
@@ -8,9 +10,7 @@ class PriceEntry(Base):
     __tablename__ = "price_entries"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    commodity_id = Column(
-        UUID(as_uuid=True), ForeignKey("commodities.id"), nullable=False
-    )
+    commodity_id = Column(UUID(as_uuid=True), ForeignKey("commodities.id"), nullable=False)
     market_id = Column(UUID(as_uuid=True), ForeignKey("markets.id"), nullable=False)
     report_date = Column(Date, index=True, nullable=False)
 

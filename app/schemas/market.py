@@ -1,6 +1,8 @@
-from pydantic import BaseModel, ConfigDict
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
+
 
 class MarketBase(BaseModel):
     name: str
@@ -8,13 +10,16 @@ class MarketBase(BaseModel):
     city: Optional[str] = None
     is_regional_average: bool = False
 
+
 class MarketCreate(MarketBase):
     pass
+
 
 class MarketUpdate(MarketBase):
     name: Optional[str] = None
 
+
 class Market(MarketBase):
     id: UUID
-    
+
     model_config = ConfigDict(from_attributes=True)

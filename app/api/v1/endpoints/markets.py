@@ -1,13 +1,14 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+
+from app.api.deps import PaginationParams, get_pagination_params
 from app.db.session import get_db
 from app.schemas.market import Market, MarketCreate
 from app.services.market_service import MarketService
 
 router = APIRouter()
-
-from app.api.deps import PaginationParams, get_pagination_params
 
 
 @router.get("/", response_model=List[Market])
@@ -17,9 +18,7 @@ def read_markets(
 ):
     from app.models.market import Market as MarketModel
 
-    markets = (
-        db.query(MarketModel).offset(pagination.skip).limit(pagination.limit).all()
-    )
+    markets = db.query(MarketModel).offset(pagination.skip).limit(pagination.limit).all()
     return markets
 
 

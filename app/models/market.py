@@ -1,7 +1,9 @@
-from sqlalchemy import Column, String, UUID, Boolean
-from sqlalchemy.orm import relationship
 import uuid
+
+from sqlalchemy import UUID, Boolean, Column, String
+
 from app.db.base_class import Base
+
 
 class Market(Base):
     __tablename__ = "markets"

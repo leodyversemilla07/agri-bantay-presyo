@@ -1,10 +1,13 @@
-from pydantic import BaseModel, ConfigDict
-from uuid import UUID
 from datetime import date
-from typing import Optional
 from decimal import Decimal
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
+
 from app.schemas.commodity import Commodity
 from app.schemas.market import Market
+
 
 class PriceEntryBase(BaseModel):
     commodity_id: UUID
@@ -19,12 +22,14 @@ class PriceEntryBase(BaseModel):
     report_type: str
     source_file: Optional[str] = None
 
+
 class PriceEntryCreate(PriceEntryBase):
     pass
+
 
 class PriceEntry(PriceEntryBase):
     id: UUID
     commodity: Optional[Commodity] = None
     market: Optional[Market] = None
-    
+
     model_config = ConfigDict(from_attributes=True)

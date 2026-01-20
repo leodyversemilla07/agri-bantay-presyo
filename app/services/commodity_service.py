@@ -1,12 +1,18 @@
+from typing import List, Optional, Union
+from uuid import UUID
+
 from sqlalchemy.orm import Session
-from typing import List, Optional
+
 from app.models.commodity import Commodity
-from app.schemas.commodity import CommodityCreate, CommodityUpdate
+from app.schemas.commodity import CommodityCreate
 
 
 class CommodityService:
     @staticmethod
-    def get(db: Session, commodity_id: str) -> Optional[Commodity]:
+    def get(db: Session, commodity_id: Union[str, UUID]) -> Optional[Commodity]:
+        # Convert string to UUID if needed
+        if isinstance(commodity_id, str):
+            commodity_id = UUID(commodity_id)
         return db.query(Commodity).filter(Commodity.id == commodity_id).first()
 
     @staticmethod
@@ -14,9 +20,7 @@ class CommodityService:
         return db.query(Commodity).filter(Commodity.name == name).first()
 
     @staticmethod
-    def get_multi(
-        db: Session, skip: int = 0, limit: int = 100, category: Optional[str] = None
-    ) -> List[Commodity]:
+    def get_multi(db: Session, skip: int = 0, limit: int = 100, category: Optional[str] = None) -> List[Commodity]:
         query = db.query(Commodity)
         if category:
             query = query.filter(Commodity.category == category)
@@ -60,9 +64,4 @@ class CommodityService:
     @staticmethod
     def search(db: Session, query: str, limit: int = 20) -> List[Commodity]:
         """Search commodities by name (case-insensitive partial match)."""
-        return (
-            db.query(Commodity)
-            .filter(Commodity.name.ilike(f"%{query}%"))
-            .limit(limit)
-            .all()
-        )
+        return db.query(Commodity).filter(Commodity.name.ilike(f"%{query}%")).limit(limit).all()

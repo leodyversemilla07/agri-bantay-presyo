@@ -1,11 +1,12 @@
 from celery import Celery
+
 from app.core.config import settings
 
 celery_app = Celery(
     "worker",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.scraper.tasks", "app.scraper.discovery"]
+    include=["app.scraper.tasks", "app.scraper.discovery"],
 )
 
 celery_app.conf.update(
@@ -15,5 +16,3 @@ celery_app.conf.update(
     timezone="Asia/Manila",
     enable_utc=True,
 )
-
-import app.core.celery_beat

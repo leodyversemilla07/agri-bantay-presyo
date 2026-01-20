@@ -1,73 +1,137 @@
-from app.core.celery_app import celery_app
-from app.scraper.downloader import PDFDownloader
-from app.scraper.parser import PriceParser
-from app.db.session import SessionLocal
-from app.db import base
-from app.services.price_service import PriceService
-from app.services.commodity_service import CommodityService
-from app.services.market_service import MarketService
-from app.schemas.commodity import CommodityCreate
-from app.schemas.market import MarketCreate
 import logging
 import os
 
+from app.core.celery_app import celery_app
+from app.core.exceptions import (
+    AIProcessingError,
+    PDFDownloadError,
+    PDFParseError,
+)
+from app.db.session import SessionLocal
+from app.scraper.downloader import PDFDownloader
+from app.scraper.parser import PriceParser
+from app.services.commodity_service import CommodityService
+from app.services.market_service import MarketService
+from app.services.price_service import PriceService
+
 logger = logging.getLogger(__name__)
 
-@celery_app.task(name="app.scraper.tasks.scrape_daily_prices")
-def scrape_daily_prices(url: str):
+
+@celery_app.task(
+    name="app.scraper.tasks.scrape_daily_prices",
+    bind=True,
+    autoretry_for=(PDFDownloadError, AIProcessingError, ConnectionError),
+    retry_backoff=True,
+    retry_backoff_max=600,  # Max 10 minutes between retries
+    retry_kwargs={"max_retries": 3},
+    acks_late=True,  # Acknowledge after task completes
+)
+def scrape_daily_prices(self, url: str):
+    """
+    Scrape daily prices from a PDF URL.
+
+    Features:
+    - Automatic retry on download/AI failures (up to 3 times with exponential backoff)
+    - Proper cleanup of downloaded files
+    - Detailed logging for debugging
+    """
     downloader = PDFDownloader()
     parser = PriceParser()
     db = SessionLocal()
     pdf_path = None
-    
+    entries_processed = 0
+
     try:
-        logger.info(f"Starting daily scrape for URL: {url}")
-        pdf_path = downloader.download_pdf_sync(url)
-        
-        # Now using AI-powered extraction for better accuracy!
-        parsed_results = parser.parse_daily_with_ai(str(pdf_path))
-        
+        logger.info(f"Starting daily scrape for URL: {url} (attempt {self.request.retries + 1})")
+
+        # Download PDF with error handling
+        try:
+            pdf_path = downloader.download_pdf_sync(url)
+        except Exception as e:
+            raise PDFDownloadError(url=url, reason=str(e))
+
+        # Parse PDF with AI
+        try:
+            parsed_results = parser.parse_daily_with_ai(str(pdf_path))
+        except Exception as e:
+            raise PDFParseError(filename=pdf_path.name if pdf_path else url, reason=str(e))
+
+        if not parsed_results:
+            logger.warning(f"No data extracted from {pdf_path.name if pdf_path else url}")
+            return {"status": "empty", "url": url, "entries": 0}
+
+        # Process each entry with individual error handling
+        errors = []
         for entry in parsed_results:
-            # 1. Get or create commodity
-            # Proactively normalize name using map.json
-            raw_name = entry["commodity"]
-            normalized_name = parser.normalization_map.get(raw_name, raw_name)
-            
-            commodity = CommodityService.get_or_create(
-                db, 
-                name=normalized_name,
-                category=entry.get("category"),
-                unit=entry.get("unit")
-            )
-            
-            # 2. Get or create market (assuming a default market for now if none specified in row)
-            # In actual PDFs, the market might be in the filename or header.
-            # For this MVP, we'll use "Default Market" or try to extract it.
-            market_name = entry.get("market", "NCR Central Market")
-            market = MarketService.get_or_create(db, name=market_name)
-            
-            # 3. Create price entry
-            PriceService.create_entry(db, {
-                "commodity_id": commodity.id,
-                "market_id": market.id,
-                "report_date": entry["report_date"],
-                "price_low": entry.get("price_low"),
-                "price_high": entry.get("price_high"),
-                "price_prevailing": entry.get("price_prevailing"),
-                "price_average": entry.get("price_average"),
-                "report_type": entry["report_type"],
-                "source_file": pdf_path.name
-            })
-            
-        logger.info(f"Successfully processed {len(parsed_results)} entries from {pdf_path.name}")
-        
-        # Clean up: Delete the PDF after successful processing
+            try:
+                # Normalize commodity name
+                raw_name = entry.get("commodity", "Unknown")
+                normalized_name = parser.normalization_map.get(raw_name, raw_name)
+
+                commodity = CommodityService.get_or_create(
+                    db,
+                    name=normalized_name,
+                    category=entry.get("category"),
+                    unit=entry.get("unit"),
+                )
+
+                market_name = entry.get("market", "NCR Central Market")
+                market = MarketService.get_or_create(db, name=market_name)
+
+                PriceService.create_entry(
+                    db,
+                    {
+                        "commodity_id": commodity.id,
+                        "market_id": market.id,
+                        "report_date": entry.get("report_date"),
+                        "price_low": entry.get("price_low"),
+                        "price_high": entry.get("price_high"),
+                        "price_prevailing": entry.get("price_prevailing"),
+                        "price_average": entry.get("price_average"),
+                        "report_type": entry.get("report_type", "DAILY_RETAIL"),
+                        "source_file": pdf_path.name if pdf_path else url.split("/")[-1],
+                    },
+                )
+                entries_processed += 1
+
+            except Exception as entry_error:
+                errors.append({"commodity": raw_name, "error": str(entry_error)})
+                logger.warning(f"Failed to process entry {raw_name}: {entry_error}")
+                continue  # Continue processing other entries
+
+        logger.info(
+            f"Successfully processed {entries_processed}/{len(parsed_results)} entries from {pdf_path.name if pdf_path else url}"
+        )
+
+        if errors:
+            logger.warning(f"Encountered {len(errors)} errors during processing")
+
+        # Clean up downloaded file
         if pdf_path and pdf_path.exists():
             os.remove(pdf_path)
             logger.info(f"Cleaned up downloaded file: {pdf_path.name}")
-        
+
+        return {
+            "status": "success",
+            "url": url,
+            "entries_processed": entries_processed,
+            "entries_total": len(parsed_results),
+            "errors": len(errors),
+        }
+
+    except (PDFDownloadError, PDFParseError, AIProcessingError) as e:
+        logger.error(f"Scraping failed (will retry): {e.message}")
+        # Clean up on failure
+        if pdf_path and pdf_path.exists():
+            os.remove(pdf_path)
+        raise  # Let Celery handle retry
+
     except Exception as e:
-        logger.error(f"Scraping failed: {e}")
-        raise e
+        logger.exception(f"Unexpected error during scraping: {e}")
+        # Clean up on failure
+        if pdf_path and pdf_path.exists():
+            os.remove(pdf_path)
+        raise
+
     finally:
         db.close()

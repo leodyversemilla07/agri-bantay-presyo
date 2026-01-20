@@ -31,7 +31,7 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 ### Infrastructure
 - **Containerization**: Docker & Docker Compose
 - **Version Control**: Git
-- **CI/CD**: GitHub Actions (planned)
+- **CI/CD**: GitHub Actions (lint, test, build, deploy)
 
 ## Project Structure
 

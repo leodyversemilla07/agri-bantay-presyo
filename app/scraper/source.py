@@ -1,9 +1,9 @@
-import httpx
-from bs4 import BeautifulSoup
-from typing import List
 import logging
 import re
-from datetime import datetime
+from typing import List
+
+import httpx
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +21,7 @@ class MonitoringSource:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
-            with httpx.Client(
-                follow_redirects=True, timeout=30.0, headers=headers
-            ) as client:
+            with httpx.Client(follow_redirects=True, timeout=30.0, headers=headers) as client:
                 response = client.get(MonitoringSource.BASE_URL)
                 response.raise_for_status()
 
@@ -55,12 +53,12 @@ class MonitoringSource:
         """
         all_links = MonitoringSource.get_latest_pdf_links()
         new_links = []
-        
+
         for url in all_links:
             # Extract filename from URL
             filename = url.split("/")[-1]
             if filename not in processed_files:
                 new_links.append(url)
-                
+
         logger.info(f"New PDFs to process: {len(new_links)}")
         return new_links

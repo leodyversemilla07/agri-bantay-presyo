@@ -1,7 +1,10 @@
-from sqlalchemy import Column, UUID, Date, Numeric, ForeignKey
-from sqlalchemy.orm import relationship
 import uuid
+
+from sqlalchemy import UUID, Column, Date, ForeignKey, Numeric
+from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
+
 
 class SupplyIndex(Base):
     __tablename__ = "supply_indices"

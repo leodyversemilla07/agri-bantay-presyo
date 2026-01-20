@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy.orm import Session
-from typing import List, Optional
 from datetime import date
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, Response
+from sqlalchemy.orm import Session
+
+from app.api.deps import PaginationParams, get_pagination_params
 from app.db.session import get_db
-from app.services.price_service import PriceService
 from app.schemas.price_entry import PriceEntry
+from app.services.price_service import PriceService
 
 router = APIRouter()
-
-from app.api.deps import get_pagination_params, PaginationParams
 
 
 @router.get("/daily", response_model=List[PriceEntry])
@@ -18,18 +19,14 @@ def get_daily_prices(
     db: Session = Depends(get_db),
 ):
     if not report_date:
-        prices = PriceService.get_latest_prices(
-            db, skip=pagination.skip, limit=pagination.limit
-        )
+        prices = PriceService.get_latest_prices(db, skip=pagination.skip, limit=pagination.limit)
     else:
         prices = PriceService.get_prices_by_date(db, report_date=report_date)
     return prices
 
 
 @router.get("/export")
-def export_prices_csv(
-    report_date: Optional[date] = None, db: Session = Depends(get_db)
-):
+def export_prices_csv(report_date: Optional[date] = None, db: Session = Depends(get_db)):
     """Export price data as CSV."""
     if report_date:
         prices = PriceService.get_prices_by_date(db, report_date=report_date)
@@ -48,16 +45,12 @@ def export_prices_csv(
         prevailing = p.price_prevailing or p.price_average or ""
         date_str = p.report_date.isoformat() if p.report_date else ""
 
-        csv_lines.append(
-            f'"{commodity}","{category}","{market}","{region}",{low},{high},{prevailing},"{date_str}"'
-        )
+        csv_lines.append(f'"{commodity}","{category}","{market}","{region}",{low},{high},{prevailing},"{date_str}"')
 
     csv_content = "\n".join(csv_lines)
 
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=prices_{report_date or 'latest'}.csv"
-        },
+        headers={"Content-Disposition": f"attachment; filename=prices_{report_date or 'latest'}.csv"},
     )

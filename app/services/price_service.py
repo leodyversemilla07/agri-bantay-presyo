@@ -1,7 +1,9 @@
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc
-from typing import List, Optional, Dict, Any
 from datetime import date
+from typing import Any, Dict, Union
+from uuid import UUID
+
+from sqlalchemy import desc
+from sqlalchemy.orm import Session, joinedload
 
 
 class PriceService:
@@ -30,9 +32,12 @@ class PriceService:
         )
 
     @staticmethod
-    def get_commodity_history(db: Session, commodity_id: str, limit: int = 30):
+    def get_commodity_history(db: Session, commodity_id: Union[str, UUID], limit: int = 30):
         from app.models.price_entry import PriceEntry
 
+        # Convert string to UUID if needed
+        if isinstance(commodity_id, str):
+            commodity_id = UUID(commodity_id)
         return (
             db.query(PriceEntry)
             .filter(PriceEntry.commodity_id == commodity_id)
@@ -43,10 +48,18 @@ class PriceService:
 
     @staticmethod
     def get_previous_price(
-        db: Session, commodity_id: str, market_id: str, current_date: date
+        db: Session,
+        commodity_id: Union[str, UUID],
+        market_id: Union[str, UUID],
+        current_date: date,
     ):
         from app.models.price_entry import PriceEntry
 
+        # Convert strings to UUID if needed
+        if isinstance(commodity_id, str):
+            commodity_id = UUID(commodity_id)
+        if isinstance(market_id, str):
+            market_id = UUID(market_id)
         return (
             db.query(PriceEntry)
             .filter(
@@ -60,10 +73,18 @@ class PriceService:
 
     @staticmethod
     def get_price_change(
-        db: Session, commodity_id: str, market_id: str, current_date: date
+        db: Session,
+        commodity_id: Union[str, UUID],
+        market_id: Union[str, UUID],
+        current_date: date,
     ):
         from app.models.price_entry import PriceEntry
 
+        # Convert strings to UUID if needed
+        if isinstance(commodity_id, str):
+            commodity_id = UUID(commodity_id)
+        if isinstance(market_id, str):
+            market_id = UUID(market_id)
         current = (
             db.query(PriceEntry)
             .filter(
@@ -77,9 +98,7 @@ class PriceService:
         if not current:
             return 0
 
-        previous = PriceService.get_previous_price(
-            db, commodity_id, market_id, current_date
-        )
+        previous = PriceService.get_previous_price(db, commodity_id, market_id, current_date)
 
         if not previous or not previous.price_prevailing:
             return 0

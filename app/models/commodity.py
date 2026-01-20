@@ -1,7 +1,10 @@
-from sqlalchemy import Column, String, UUID
-from sqlalchemy.orm import relationship
 import uuid
+
+from sqlalchemy import UUID, Column, String
+from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
+
 
 class Commodity(Base):
     __tablename__ = "commodities"

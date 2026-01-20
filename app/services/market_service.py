@@ -1,13 +1,19 @@
+from typing import Union
+from uuid import UUID
+
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from app.schemas.market import MarketCreate, MarketUpdate
+
+from app.schemas.market import MarketCreate
 
 
 class MarketService:
     @staticmethod
-    def get(db: Session, market_id: str):
+    def get(db: Session, market_id: Union[str, UUID]):
         from app.models.market import Market
 
+        # Convert string to UUID if needed
+        if isinstance(market_id, str):
+            market_id = UUID(market_id)
         return db.query(Market).filter(Market.id == market_id).first()
 
     @staticmethod
@@ -50,6 +56,4 @@ class MarketService:
         """Search markets by name (case-insensitive partial match)."""
         from app.models.market import Market
 
-        return (
-            db.query(Market).filter(Market.name.ilike(f"%{query}%")).limit(limit).all()
-        )
+        return db.query(Market).filter(Market.name.ilike(f"%{query}%")).limit(limit).all()

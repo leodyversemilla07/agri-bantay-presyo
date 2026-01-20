@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, Request
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from typing import List
-from pathlib import Path
 import json
+from pathlib import Path
+from typing import List
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.commodity import Commodity
@@ -22,11 +23,9 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 def get_ticker_items(db: Session) -> List[dict]:
     """Get latest prices for ticker display."""
-    from datetime import date
 
     commodities = db.query(Commodity).limit(10).all()
     ticker_items = []
-    today = date.today()
 
     for comm in commodities:
         latest_price = (
@@ -38,16 +37,10 @@ def get_ticker_items(db: Session) -> List[dict]:
 
         if latest_price:
             price = latest_price.price_prevailing or latest_price.price_average or 0
-            change = PriceService.get_price_change(
-                db, comm.id, latest_price.market_id, latest_price.report_date
-            )
-            ticker_items.append(
-                {"name": comm.name[:20], "price": price, "change": change}
-            )
+            change = PriceService.get_price_change(db, comm.id, latest_price.market_id, latest_price.report_date)
+            ticker_items.append({"name": comm.name[:20], "price": price, "change": change})
 
-    return (
-        ticker_items if ticker_items else [{"name": "No Data", "price": 0, "change": 0}]
-    )
+    return ticker_items if ticker_items else [{"name": "No Data", "price": 0, "change": 0}]
 
 
 def get_dashboard_stats(db: Session) -> dict:
@@ -61,9 +54,7 @@ def get_dashboard_stats(db: Session) -> dict:
 
 def get_chart_data(db: Session, commodity_id: str, limit: int = 30) -> List[dict]:
     """Get chart data for a commodity."""
-    history = PriceService.get_commodity_history(
-        db, commodity_id=commodity_id, limit=limit
-    )
+    history = PriceService.get_commodity_history(db, commodity_id=commodity_id, limit=limit)
 
     chart_data = []
     for h in reversed(history):
@@ -73,20 +64,8 @@ def get_chart_data(db: Session, commodity_id: str, limit: int = 30) -> List[dict
         if isinstance(date_obj, str):
             date_obj = datetime.fromisoformat(date_obj)
 
-        price = (
-            h.price_prevailing
-            if hasattr(h, "price_prevailing")
-            else h.get("price_prevailing", 0)
-        )
-        price = (
-            price
-            or (
-                h.price_average
-                if hasattr(h, "price_average")
-                else h.get("price_average", 0)
-            )
-            or 0
-        )
+        price = h.price_prevailing if hasattr(h, "price_prevailing") else h.get("price_prevailing", 0)
+        price = price or (h.price_average if hasattr(h, "price_average") else h.get("price_average", 0)) or 0
         low = h.price_low if hasattr(h, "price_low") else h.get("price_low", 0)
         high = h.price_high if hasattr(h, "price_high") else h.get("price_high", 0)
 
@@ -146,9 +125,7 @@ async def markets_page(request: Request, db: Session = Depends(get_db), q: str =
     regions = [r[0] for r in regions if r[0]]
 
     # Get latest prices with commodity and market info
-    prices_query = (
-        db.query(PriceEntry).order_by(desc(PriceEntry.report_date)).limit(500).all()
-    )
+    prices_query = db.query(PriceEntry).order_by(desc(PriceEntry.report_date)).limit(500).all()
 
     prices_data = []
     for p in prices_query:
@@ -166,17 +143,13 @@ async def markets_page(request: Request, db: Session = Depends(get_db), q: str =
                 "market_region": market.region if market else "",
                 "price_low": float(p.price_low) if p.price_low else None,
                 "price_high": float(p.price_high) if p.price_high else None,
-                "price_prevailing": float(p.price_prevailing)
-                if p.price_prevailing
-                else None,
+                "price_prevailing": float(p.price_prevailing) if p.price_prevailing else None,
                 "price_average": float(p.price_average) if p.price_average else None,
                 "report_date": p.report_date.isoformat() if p.report_date else None,
             }
         )
 
-    markets_data = [
-        {"id": str(m.id), "name": m.name, "region": m.region} for m in markets
-    ]
+    markets_data = [{"id": str(m.id), "name": m.name, "region": m.region} for m in markets]
 
     return templates.TemplateResponse(
         "markets.html",

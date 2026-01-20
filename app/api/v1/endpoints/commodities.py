@@ -1,13 +1,13 @@
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+
 from app.db.session import get_db
 from app.schemas.commodity import Commodity, CommodityCreate
 from app.services.commodity_service import CommodityService
 
 router = APIRouter()
-
-from typing import List, Optional
 
 
 @router.get("/", response_model=List[Commodity])

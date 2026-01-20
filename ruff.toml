@@ -1,0 +1,21 @@
+# Ruff configuration for Agri Bantay Presyo
+
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # Allow longer lines (enforced by formatter at 120)
+
+[lint.per-file-ignores]
+# Scripts that need sys.path manipulation before imports
+"scripts/*.py" = ["E402"]
+"tests/debug_*.py" = ["E402"]
+"tests/test_2025_alignment.py" = ["E402"]
+"tests/test_ai_ingestion.py" = ["E402"]
+# Alembic migrations are auto-generated
+"alembic/versions/*.py" = ["E501"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

@@ -5,12 +5,11 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.session import SessionLocal
-from app.db import base
+from app.models.commodity import Commodity
+from app.models.market import Market
 from app.models.price_entry import PriceEntry
 from app.models.supply_index import SupplyIndex
-from app.models.market import Market
-from app.models.commodity import Commodity
-from sqlalchemy import delete
+
 
 def wipe_data():
     db = SessionLocal()
@@ -28,6 +27,7 @@ def wipe_data():
         db.rollback()
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     wipe_data()
