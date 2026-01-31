@@ -6,8 +6,9 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 # Add the backend directory to sys.path so we can import app
-backend_dir = Path("c:/Users/Leodyver/CodeSanctum/agri-bantay-presyo/backend")
-sys.path.append(str(backend_dir))
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.append(str(backend_dir))
 
 import logging
 

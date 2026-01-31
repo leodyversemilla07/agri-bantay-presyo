@@ -96,9 +96,9 @@ async def home(request: Request, db: Session = Depends(get_db)):
         chart_data = get_chart_data(db, default_commodity.id, limit=30)
 
     return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
+        request=request,
+        name="index.html",
+        context={
             "ticker_items": ticker_items,
             "stats": stats,
             "default_commodity": default_commodity_name,
@@ -152,9 +152,9 @@ async def markets_page(request: Request, db: Session = Depends(get_db), q: str =
     markets_data = [{"id": str(m.id), "name": m.name, "region": m.region} for m in markets]
 
     return templates.TemplateResponse(
-        "markets.html",
-        {
-            "request": request,
+        request=request,
+        name="markets.html",
+        context={
             "ticker_items": ticker_items,
             "markets": markets_data,
             "categories": categories,
@@ -187,9 +187,9 @@ async def analytics_page(request: Request, db: Session = Depends(get_db)):
             current_price = chart_data[-1]["price"]
 
     return templates.TemplateResponse(
-        "analytics.html",
-        {
-            "request": request,
+        request=request,
+        name="analytics.html",
+        context={
             "ticker_items": ticker_items,
             "stats": stats,
             "commodities": commodities_data,
