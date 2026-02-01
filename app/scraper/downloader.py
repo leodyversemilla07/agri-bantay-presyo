@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
+import aiofiles
 import httpx
 
 from app.core.exceptions import PDFDownloadError
@@ -163,8 +164,8 @@ class PDFDownloader:
                             reason=f"Response is not a PDF (content-type: {content_type})",
                         )
 
-                    with open(target_path, "wb") as f:
-                        f.write(response.content)
+                    async with aiofiles.open(target_path, "wb") as f:
+                        await f.write(response.content)
 
                     logger.info(f"Successfully downloaded: {target_path}")
                     return target_path
