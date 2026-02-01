@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from app.core.cache import get_cached_data
 from app.db.session import get_db
 from app.models.commodity import Commodity
 from app.models.market import Market
@@ -38,9 +39,13 @@ def get_ticker_items(db: Session) -> List[dict]:
         if latest_price:
             price = latest_price.price_prevailing or latest_price.price_average or 0
             change = PriceService.get_price_change(db, comm.id, latest_price.market_id, latest_price.report_date)
-            ticker_items.append({"name": comm.name[:20], "price": price, "change": change})
+            ticker_items.append({
+                "name": comm.name[:20],
+                "price": float(price) if price else 0.0,
+                "change": float(change) if change else 0.0,
+            })
 
-    return ticker_items if ticker_items else [{"name": "No Data", "price": 0, "change": 0}]
+    return ticker_items if ticker_items else [{"name": "No Data", "price": 0.0, "change": 0.0}]
 
 
 def get_dashboard_stats(db: Session) -> dict:
@@ -84,8 +89,8 @@ def get_chart_data(db: Session, commodity_id: str, limit: int = 30) -> List[dict
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db)):
     """Home page with overview dashboard."""
-    ticker_items = get_ticker_items(db)
-    stats = get_dashboard_stats(db)
+    ticker_items = await get_cached_data("dashboard:ticker_items", lambda: get_ticker_items(db), ttl=300)
+    stats = await get_cached_data("dashboard:stats", lambda: get_dashboard_stats(db), ttl=300)
 
     # Get default commodity for chart
     default_commodity = db.query(Commodity).first()
