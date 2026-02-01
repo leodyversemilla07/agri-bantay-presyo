@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic_settings import BaseSettings
 
@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Agri Bantay Presyo"
     API_V1_STR: str = "/api/v1"
+    BACKEND_CORS_ORIGINS: List[str] = []
 
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
