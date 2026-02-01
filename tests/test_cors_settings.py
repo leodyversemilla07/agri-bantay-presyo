@@ -1,10 +1,13 @@
 
-import os
 import importlib
-from fastapi.testclient import TestClient
+import os
 from unittest import mock
+
 import pytest
-from app import main, core
+from fastapi.testclient import TestClient
+
+from app import core, main
+
 
 @pytest.fixture
 def app_with_cors_settings():
