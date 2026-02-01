@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc
+from sqlalchemy import desc, func, and_, or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -23,21 +23,103 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 def get_ticker_items(db: Session) -> List[dict]:
     """Get latest prices for ticker display."""
-
     commodities = db.query(Commodity).limit(10).all()
-    ticker_items = []
+    if not commodities:
+        return [{"name": "No Data", "price": 0, "change": 0}]
 
-    for comm in commodities:
-        latest_price = (
-            db.query(PriceEntry)
-            .filter(PriceEntry.commodity_id == comm.id)
-            .order_by(desc(PriceEntry.report_date))
-            .first()
+    comm_ids = [c.id for c in commodities]
+
+    # Fetch latest prices for these commodities efficiently
+    subq = (
+        db.query(
+            PriceEntry.id,
+            func.row_number()
+            .over(partition_by=PriceEntry.commodity_id, order_by=desc(PriceEntry.report_date))
+            .label("rn"),
+        )
+        .filter(PriceEntry.commodity_id.in_(comm_ids))
+        .subquery()
+    )
+
+    latest_entries = (
+        db.query(PriceEntry)
+        .join(subq, PriceEntry.id == subq.c.id)
+        .filter(subq.c.rn == 1)
+        .all()
+    )
+
+    latest_map = {str(e.commodity_id): e for e in latest_entries}
+
+    # Identify (commodity, market) pairs to fetch history for
+    pairs = [(e.commodity_id, e.market_id) for e in latest_entries]
+
+    history_map = {}
+    if pairs:
+        # Construct filter for these pairs
+        filters = [
+            and_(PriceEntry.commodity_id == c_id, PriceEntry.market_id == m_id)
+            for c_id, m_id in pairs
+        ]
+
+        # Fetch top 2 entries for each pair (latest + previous)
+        subq_prev = (
+            db.query(
+                PriceEntry.id,
+                PriceEntry.commodity_id,
+                PriceEntry.market_id,
+                func.row_number()
+                .over(
+                    partition_by=(PriceEntry.commodity_id, PriceEntry.market_id),
+                    order_by=desc(PriceEntry.report_date),
+                )
+                .label("rn"),
+            )
+            .filter(or_(*filters))
+            .subquery()
         )
 
-        if latest_price:
-            price = latest_price.price_prevailing or latest_price.price_average or 0
-            change = PriceService.get_price_change(db, comm.id, latest_price.market_id, latest_price.report_date)
+        history_entries = (
+            db.query(PriceEntry)
+            .join(subq_prev, PriceEntry.id == subq_prev.c.id)
+            .filter(subq_prev.c.rn <= 2)
+            .all()
+        )
+
+        for entry in history_entries:
+            key = (str(entry.commodity_id), str(entry.market_id))
+            if key not in history_map:
+                history_map[key] = []
+            history_map[key].append(entry)
+
+        # Ensure sorted
+        for key in history_map:
+            history_map[key].sort(key=lambda x: x.report_date, reverse=True)
+
+    ticker_items = []
+    for comm in commodities:
+        latest = latest_map.get(str(comm.id))
+
+        if latest:
+            price = latest.price_prevailing or latest.price_average or 0
+
+            # Calculate change
+            key = (str(comm.id), str(latest.market_id))
+            history = history_map.get(key, [])
+
+            change = 0
+            # Find the first entry strictly before the latest report date
+            prev_entry = None
+            for h in history:
+                if h.report_date < latest.report_date:
+                    prev_entry = h
+                    break
+
+            if prev_entry:
+                prev_price = prev_entry.price_prevailing or 0
+                if prev_price > 0:
+                    current_price = price
+                    change = round(((current_price - prev_price) / prev_price) * 100, 1)
+
             ticker_items.append({"name": comm.name[:20], "price": price, "change": change})
 
     return ticker_items if ticker_items else [{"name": "No Data", "price": 0, "change": 0}]
