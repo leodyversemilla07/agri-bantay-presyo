@@ -1,8 +1,10 @@
-import json
 import asyncio
-from typing import Any, Callable, TypeVar, Optional
-from redis.asyncio import Redis
+import json
+from typing import Any, Callable, Optional
+
 from fastapi.concurrency import run_in_threadpool
+from redis.asyncio import Redis
+
 from app.core.config import settings
 
 redis_client: Optional[Redis] = None
