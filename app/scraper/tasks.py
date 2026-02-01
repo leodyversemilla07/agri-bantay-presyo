@@ -2,6 +2,7 @@ import logging
 import os
 
 from app.core.celery_app import celery_app
+from app.core.config import settings
 from app.core.exceptions import (
     AIProcessingError,
     PDFDownloadError,
@@ -102,7 +103,8 @@ def scrape_daily_prices(self, url: str):
                 if not commodity:
                     raise ValueError(f"Commodity {normalized_name} unavailable")
 
-                market_name = entry.get("market", "NCR Central Market")
+                # Use configurable default market from settings
+                market_name = entry.get("market", settings.DEFAULT_MARKET_NAME)
                 market = MarketService.get_or_create(db, name=market_name)
 
                 PriceService.create_entry(

@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.core.rate_limiter import limiter
 from app.db.session import get_db
 
 router = APIRouter()
 
 
 @router.get("/dashboard")
-def get_dashboard_stats(db: Session = Depends(get_db)):
+@limiter.limit("200/minute")
+def get_dashboard_stats(request: Request, db: Session = Depends(get_db)):
     from app.models.commodity import Commodity
     from app.models.market import Market
     from app.models.price_entry import PriceEntry

@@ -198,18 +198,29 @@ async def home(request: Request, db: Session = Depends(get_db)):
 @router.get("/markets", response_class=HTMLResponse)
 async def markets_page(request: Request, db: Session = Depends(get_db), q: str = None):
     """Markets page with filterable data table."""
-    ticker_items = get_ticker_items(db)
+    # Use caching for ticker items
+    ticker_items = await get_cached_data(
+        "dashboard:ticker_items",
+        lambda: get_ticker_items(db),
+        ttl=300
+    )
 
     # Get all markets
     markets = db.query(Market).all()
 
-    # Get categories
-    categories = db.query(Commodity.category).distinct().all()
-    categories = [c[0] for c in categories if c[0]]
+    # Get categories (cached)
+    async def fetch_categories():
+        categories = db.query(Commodity.category).distinct().all()
+        return [c[0] for c in categories if c[0]]
+    
+    categories = await get_cached_data("markets:categories", fetch_categories, ttl=600)
 
-    # Get unique regions
-    regions = db.query(Market.region).distinct().all()
-    regions = [r[0] for r in regions if r[0]]
+    # Get unique regions (cached)
+    async def fetch_regions():
+        regions = db.query(Market.region).distinct().all()
+        return [r[0] for r in regions if r[0]]
+    
+    regions = await get_cached_data("markets:regions", fetch_regions, ttl=600)
 
     # Get latest prices with commodity and market info (using joinedload to avoid N+1)
     prices_query = (
@@ -261,8 +272,17 @@ async def markets_page(request: Request, db: Session = Depends(get_db), q: str =
 @router.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request, db: Session = Depends(get_db)):
     """Analytics page with advanced charts."""
-    ticker_items = get_ticker_items(db)
-    stats = get_dashboard_stats(db)
+    # Use caching for ticker items and stats
+    ticker_items = await get_cached_data(
+        "dashboard:ticker_items",
+        lambda: get_ticker_items(db),
+        ttl=300
+    )
+    stats = await get_cached_data(
+        "dashboard:stats",
+        lambda: get_dashboard_stats(db),
+        ttl=300
+    )
 
     # Get all commodities
     commodities = db.query(Commodity).all()

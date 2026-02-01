@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import UUID, Boolean, Column, String
+from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
 
@@ -14,4 +15,4 @@ class Market(Base):
     city = Column(String)
     is_regional_average = Column(Boolean, default=False)
 
-    # price_entries = relationship("PriceEntry", back_populates="market")
+    price_entries = relationship("PriceEntry", back_populates="market")

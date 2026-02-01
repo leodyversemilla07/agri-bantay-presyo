@@ -1,10 +1,11 @@
 from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import PaginationParams, get_pagination_params
+from app.core.rate_limiter import limiter
 from app.db.session import get_db
 from app.schemas.price_entry import PriceEntry
 from app.services.price_service import PriceService
@@ -13,7 +14,9 @@ router = APIRouter()
 
 
 @router.get("/daily", response_model=List[PriceEntry])
+@limiter.limit("200/minute")
 def get_daily_prices(
+    request: Request,
     report_date: Optional[date] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
     db: Session = Depends(get_db),
@@ -26,7 +29,8 @@ def get_daily_prices(
 
 
 @router.get("/export")
-def export_prices_csv(report_date: Optional[date] = None, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def export_prices_csv(request: Request, report_date: Optional[date] = None, db: Session = Depends(get_db)):
     """Export price data as CSV."""
     if report_date:
         prices = PriceService.get_prices_by_date(db, report_date=report_date)

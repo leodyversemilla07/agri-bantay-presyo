@@ -4,12 +4,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import configure_mappers
 
 from app.api.v1.api import api_router
 from app.api.views import router as views_router
 from app.core.config import settings
 from app.core.error_handlers import register_exception_handlers
+from app.core.rate_limiter import limiter
 
 # Configure mappers after imports
 configure_mappers()
@@ -26,6 +29,10 @@ app = FastAPI(
     description="Agricultural price monitoring API for the Philippines",
     version="1.0.0",
 )
+
+# Register rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Register exception handlers
 register_exception_handlers(app)
@@ -50,3 +57,8 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(views_router, tags=["views"])
 
 logger.info(f"Application started: {settings.PROJECT_NAME}")
+logger.info(f"Rate limiting: {settings.RATE_LIMIT_REQUESTS} requests per {settings.RATE_LIMIT_WINDOW} seconds")
+if settings.API_KEY:
+    logger.info("API key authentication is enabled")
+else:
+    logger.warning("API key authentication is disabled (no API_KEY configured)")
