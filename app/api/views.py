@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 from typing import List
 
@@ -21,8 +22,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+# Cache for ticker items
+_TICKER_CACHE = {
+    "data": [],
+    "last_updated": 0,
+    "ttl": 300,  # 5 minutes
+}
+
+
 def get_ticker_items(db: Session) -> List[dict]:
     """Get latest prices for ticker display."""
+    # Check cache
+    now = time.time()
+    if _TICKER_CACHE["data"] and (now - _TICKER_CACHE["last_updated"] < _TICKER_CACHE["ttl"]):
+        # Return a copy to prevent mutation of cached data
+        return list(_TICKER_CACHE["data"])
 
     commodities = db.query(Commodity).limit(10).all()
     ticker_items = []
@@ -40,7 +54,13 @@ def get_ticker_items(db: Session) -> List[dict]:
             change = PriceService.get_price_change(db, comm.id, latest_price.market_id, latest_price.report_date)
             ticker_items.append({"name": comm.name[:20], "price": price, "change": change})
 
-    return ticker_items if ticker_items else [{"name": "No Data", "price": 0, "change": 0}]
+    result = ticker_items if ticker_items else [{"name": "No Data", "price": 0, "change": 0}]
+
+    # Update cache
+    _TICKER_CACHE["data"] = result
+    _TICKER_CACHE["last_updated"] = now
+
+    return result
 
 
 def get_dashboard_stats(db: Session) -> dict:
