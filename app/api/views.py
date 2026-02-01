@@ -82,7 +82,7 @@ def get_chart_data(db: Session, commodity_id: str, limit: int = 30) -> List[dict
 
 
 @router.get("/", response_class=HTMLResponse)
-async def home(request: Request, db: Session = Depends(get_db)):
+def home(request: Request, db: Session = Depends(get_db)):
     """Home page with overview dashboard."""
     ticker_items = get_ticker_items(db)
     stats = get_dashboard_stats(db)
@@ -109,7 +109,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/markets", response_class=HTMLResponse)
-async def markets_page(request: Request, db: Session = Depends(get_db), q: str = None):
+def markets_page(request: Request, db: Session = Depends(get_db), q: str = None):
     """Markets page with filterable data table."""
     ticker_items = get_ticker_items(db)
 
@@ -166,7 +166,7 @@ async def markets_page(request: Request, db: Session = Depends(get_db), q: str =
 
 
 @router.get("/analytics", response_class=HTMLResponse)
-async def analytics_page(request: Request, db: Session = Depends(get_db)):
+def analytics_page(request: Request, db: Session = Depends(get_db)):
     """Analytics page with advanced charts."""
     ticker_items = get_ticker_items(db)
     stats = get_dashboard_stats(db)
