@@ -60,20 +60,47 @@ def scrape_daily_prices(self, url: str):
             logger.warning(f"No data extracted from {pdf_path.name if pdf_path else url}")
             return {"status": "empty", "url": url, "entries": 0}
 
+        # Pre-process entries to normalize names and identify unique commodities
+        unique_commodity_names = set()
+        name_to_sample_entry = {}
+
+        for entry in parsed_results:
+            raw_name = entry.get("commodity", "Unknown")
+            normalized_name = parser.normalization_map.get(raw_name, raw_name)
+            entry["_normalized_name"] = normalized_name
+            unique_commodity_names.add(normalized_name)
+            if normalized_name not in name_to_sample_entry:
+                name_to_sample_entry[normalized_name] = entry
+
+        # Bulk fetch existing commodities
+        existing_commodities = CommodityService.get_by_names(db, list(unique_commodity_names))
+        commodity_map = {c.name: c for c in existing_commodities}
+
+        # Create missing commodities
+        for name in unique_commodity_names:
+            if name not in commodity_map:
+                try:
+                    sample = name_to_sample_entry[name]
+                    new_commodity = CommodityService.get_or_create(
+                        db,
+                        name=name,
+                        category=sample.get("category"),
+                        unit=sample.get("unit"),
+                    )
+                    commodity_map[name] = new_commodity
+                except Exception as e:
+                    logger.error(f"Failed to create commodity {name}: {e}")
+
         # Process each entry with individual error handling
         errors = []
         for entry in parsed_results:
             try:
-                # Normalize commodity name
                 raw_name = entry.get("commodity", "Unknown")
-                normalized_name = parser.normalization_map.get(raw_name, raw_name)
+                normalized_name = entry.get("_normalized_name")
 
-                commodity = CommodityService.get_or_create(
-                    db,
-                    name=normalized_name,
-                    category=entry.get("category"),
-                    unit=entry.get("unit"),
-                )
+                commodity = commodity_map.get(normalized_name)
+                if not commodity:
+                    raise ValueError(f"Commodity {normalized_name} unavailable")
 
                 market_name = entry.get("market", "NCR Central Market")
                 market = MarketService.get_or_create(db, name=market_name)
@@ -95,8 +122,9 @@ def scrape_daily_prices(self, url: str):
                 entries_processed += 1
 
             except Exception as entry_error:
-                errors.append({"commodity": raw_name, "error": str(entry_error)})
-                logger.warning(f"Failed to process entry {raw_name}: {entry_error}")
+                entry_name = entry.get("commodity", "Unknown")
+                errors.append({"commodity": entry_name, "error": str(entry_error)})
+                logger.warning(f"Failed to process entry {entry_name}: {entry_error}")
                 continue  # Continue processing other entries
 
         logger.info(

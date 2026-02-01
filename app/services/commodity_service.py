@@ -41,25 +41,22 @@ class CommodityService:
 
     @staticmethod
     def get_or_create(db: Session, name: str, **kwargs) -> Commodity:
-        import json
-        from pathlib import Path
-
-        # Load map to normalize name before lookup
-        map_path = Path(__file__).parent.parent / "scraper" / "map.json"
-        normalized_name = name
-        if map_path.exists():
-            with open(map_path, "r") as f:
-                mapping = json.load(f).get("commodities", {})
-                normalized_name = mapping.get(name, name)
-
-        commodity = CommodityService.get_by_name(db, normalized_name)
+        # Note: name is expected to be already normalized by the caller
+        commodity = CommodityService.get_by_name(db, name)
         if not commodity:
-            db_obj = Commodity(name=normalized_name, **kwargs)
+            db_obj = Commodity(name=name, **kwargs)
             db.add(db_obj)
             db.commit()
             db.refresh(db_obj)
             return db_obj
         return commodity
+
+    @staticmethod
+    def get_by_names(db: Session, names: List[str]) -> List[Commodity]:
+        """Bulk fetch commodities by names."""
+        if not names:
+            return []
+        return db.query(Commodity).filter(Commodity.name.in_(names)).all()
 
     @staticmethod
     def search(db: Session, query: str, limit: int = 20) -> List[Commodity]:
