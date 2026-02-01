@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.models.commodity import Commodity
@@ -125,12 +125,18 @@ async def markets_page(request: Request, db: Session = Depends(get_db), q: str =
     regions = [r[0] for r in regions if r[0]]
 
     # Get latest prices with commodity and market info
-    prices_query = db.query(PriceEntry).order_by(desc(PriceEntry.report_date)).limit(500).all()
+    prices_query = (
+        db.query(PriceEntry)
+        .options(joinedload(PriceEntry.commodity), joinedload(PriceEntry.market))
+        .order_by(desc(PriceEntry.report_date))
+        .limit(500)
+        .all()
+    )
 
     prices_data = []
     for p in prices_query:
-        commodity = db.query(Commodity).filter(Commodity.id == p.commodity_id).first()
-        market = db.query(Market).filter(Market.id == p.market_id).first()
+        commodity = p.commodity
+        market = p.market
 
         prices_data.append(
             {
