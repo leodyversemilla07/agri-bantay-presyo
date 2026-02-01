@@ -11,6 +11,18 @@ from app.scraper.ai_processor import AIProcessor
 
 logger = logging.getLogger(__name__)
 
+IGNORED_KEYWORDS = (
+    "market",
+    "public",
+    "agora",
+    "cloverleaf",
+    "plaza",
+    "available only",
+    "disclaimer",
+    "source:",
+    "note:",
+)
+
 
 class PriceParser:
     def __init__(self, map_path: str = None):
@@ -80,20 +92,12 @@ class PriceParser:
 
                         # FILTER: Skip rows that look like markets or footnotes
                         text_content = " ".join([c for c in cleaned_row if c]).lower()
-                        if any(
-                            kw in text_content
-                            for kw in [
-                                "market",
-                                "public",
-                                "agora",
-                                "cloverleaf",
-                                "plaza",
-                                "available only",
-                                "disclaimer",
-                                "source:",
-                                "note:",
-                            ]
-                        ):
+                        should_skip = False
+                        for kw in IGNORED_KEYWORDS:
+                            if kw in text_content:
+                                should_skip = True
+                                break
+                        if should_skip:
                             continue
 
                         # 2025 Layout Heuristic: Detect column indices based on headers or content
