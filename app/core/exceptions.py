@@ -102,34 +102,6 @@ class ExternalServiceError(AgriBantayError):
     pass
 
 
-class AIProcessingError(ExternalServiceError):
-    """Raised when AI processing fails."""
-
-    def __init__(self, service: str = "Gemini", reason: str = "Unknown error"):
-        super().__init__(
-            message=f"AI processing failed: {reason}",
-            details={"service": service, "reason": reason},
-        )
-
-
-class AIRateLimitError(ExternalServiceError):
-    """Raised when AI service rate limit is exceeded."""
-
-    def __init__(self, retry_after: Optional[int] = None):
-        super().__init__(
-            message="AI service rate limit exceeded",
-            details={"retry_after_seconds": retry_after},
-        )
-
-
-class AIConfigurationError(ExternalServiceError):
-    """Raised when AI service is not properly configured."""
-
-    def __init__(self, reason: str = "API key missing or invalid"):
-        super().__init__(
-            message=f"AI service configuration error: {reason}",
-            details={"reason": reason},
-        )
 
 
 # === Validation Errors ===

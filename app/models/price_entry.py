@@ -18,6 +18,8 @@ class PriceEntry(Base):
     price_high = Column(Numeric(10, 2))
     price_prevailing = Column(Numeric(10, 2))
     price_average = Column(Numeric(10, 2))
+    period_start = Column(Date)
+    period_end = Column(Date)
 
     report_type = Column(String, index=True, default="DAILY_RETAIL")
     source_file = Column(String)

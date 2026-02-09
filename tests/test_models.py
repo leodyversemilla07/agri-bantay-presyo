@@ -93,6 +93,8 @@ class TestPriceEntryModel:
             price_high=Decimal("55.00"),
             price_prevailing=Decimal("50.00"),
             price_average=Decimal("50.00"),
+            period_start=date(2025, 1, 1),
+            period_end=date(2025, 1, 15),
             report_type="DAILY_RETAIL",
             source_file="test.pdf",
         )
@@ -101,6 +103,8 @@ class TestPriceEntryModel:
 
         assert entry.id is not None
         assert entry.price_prevailing == Decimal("50.00")
+        assert entry.period_start == date(2025, 1, 1)
+        assert entry.period_end == date(2025, 1, 15)
 
     def test_price_entry_relationships(self, db_session, sample_commodity, sample_market):
         """Test price entry relationships."""

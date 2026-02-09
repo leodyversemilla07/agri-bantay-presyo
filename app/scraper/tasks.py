@@ -1,13 +1,10 @@
 import logging
 import os
+from datetime import date, datetime
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
-from app.core.exceptions import (
-    AIProcessingError,
-    PDFDownloadError,
-    PDFParseError,
-)
+from app.core.exceptions import PDFDownloadError, PDFParseError
 from app.db.session import SessionLocal
 from app.scraper.downloader import PDFDownloader
 from app.scraper.parser import PriceParser
@@ -18,10 +15,25 @@ from app.services.price_service import PriceService
 logger = logging.getLogger(__name__)
 
 
+def _normalize_report_date(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value).date()
+        except ValueError:
+            return None
+    return None
+
+
 @celery_app.task(
     name="app.scraper.tasks.scrape_daily_prices",
     bind=True,
-    autoretry_for=(PDFDownloadError, AIProcessingError, ConnectionError),
+    autoretry_for=(PDFDownloadError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,  # Max 10 minutes between retries
     retry_kwargs={"max_retries": 3},
@@ -32,7 +44,7 @@ def scrape_daily_prices(self, url: str):
     Scrape daily prices from a PDF URL.
 
     Features:
-    - Automatic retry on download/AI failures (up to 3 times with exponential backoff)
+    - Automatic retry on download failures (up to 3 times with exponential backoff)
     - Proper cleanup of downloaded files
     - Detailed logging for debugging
     """
@@ -51,9 +63,9 @@ def scrape_daily_prices(self, url: str):
         except Exception as e:
             raise PDFDownloadError(url=url, reason=str(e))
 
-        # Parse PDF with AI
+        # Parse PDF deterministically
         try:
-            parsed_results = parser.parse_daily_with_ai(str(pdf_path))
+            parsed_results = parser.parse_daily_prevailing(str(pdf_path))
         except Exception as e:
             raise PDFParseError(filename=pdf_path.name if pdf_path else url, reason=str(e))
 
@@ -107,12 +119,16 @@ def scrape_daily_prices(self, url: str):
                 market_name = entry.get("market", settings.DEFAULT_MARKET_NAME)
                 market = MarketService.get_or_create(db, name=market_name)
 
+                report_date = _normalize_report_date(entry.get("report_date"))
+                if report_date is None:
+                    raise ValueError("Invalid report_date (expected ISO date or date object)")
+
                 PriceService.create_entry(
                     db,
                     {
                         "commodity_id": commodity.id,
                         "market_id": market.id,
-                        "report_date": entry.get("report_date"),
+                        "report_date": report_date,
                         "price_low": entry.get("price_low"),
                         "price_high": entry.get("price_high"),
                         "price_prevailing": entry.get("price_prevailing"),
@@ -149,7 +165,7 @@ def scrape_daily_prices(self, url: str):
             "errors": len(errors),
         }
 
-    except (PDFDownloadError, PDFParseError, AIProcessingError) as e:
+    except (PDFDownloadError, PDFParseError) as e:
         logger.error(f"Scraping failed (will retry): {e.message}")
         # Clean up on failure
         if pdf_path and pdf_path.exists():

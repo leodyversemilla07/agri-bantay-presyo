@@ -31,7 +31,7 @@ graph TD
 │   ├── models/             # SQLAlchemy ORM Models
 │   ├── schemas/            # Pydantic Schemas (Request/Response)
 │   ├── services/           # Business Logic (CRUD, etc.)
-│   ├── scraper/            # PDF Extraction Logic (Gemini AI)
+│   ├── scraper/            # PDF Extraction Logic (Deterministic)
 │   ├── templates/          # Jinja2 Templates (Home, Markets, Analytics)
 │   ├── static/             # Static assets
 │   └── main.py             # App Entry Point
@@ -60,7 +60,7 @@ graph TD
 | `models/` | **DB Tables**. SQLAlchemy models representing database tables (e.g., `Commodity`, `Market`). |
 | `schemas/` | **Data Validation**. Pydantic models for API request/response bodies. |
 | `services/` | Reusable business logic separate from routes. |
-| `scraper/` | **AI Parser**. Logic for processing PDFs using Google Gemini AI. |
+| `scraper/` | Deterministic parser. Logic for processing PDFs using layout-aware extraction. |
 | `templates/` | **Jinja2 Templates**. Server-rendered HTML pages. |
 | `static/` | Static files (CSS, JS, images). |
 

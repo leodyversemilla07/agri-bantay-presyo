@@ -5,10 +5,10 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.127.1-green.svg)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 
-Agri Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources and uses **Google Gemini AI** to intelligently parse complex, inconsistent PDF layouts. Data is stored in a structured PostgreSQL database for easy querying and analysis.
+Agri Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources and uses deterministic, layout-aware parsing for PDF extraction. Data is stored in a structured PostgreSQL database for easy querying and analysis.
 
 Built as a full-stack web application, it features:
-- **Backend**: FastAPI (Python) with **AI-powered PDF processing**, robust data standardization, RESTful API endpoints, and server-rendered Jinja2 templates.
+- **Backend**: FastAPI (Python) with deterministic PDF processing, robust data standardization, RESTful API endpoints, and server-rendered Jinja2 templates.
 - **Data Processing**: Intelligent mapping of commodity names, automated backfilling of historical data (2018-Present), and conflict resolution for duplicate entries.
 
 The system provides farmers, consumers, policymakers, and developers with real-time access to agricultural price trends, enabling better decision-making and research through an open API and user-friendly visualization tools.
@@ -18,8 +18,7 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 ### Backend
 - **Framework**: FastAPI 0.127.1 (Python)
 - **Database**: PostgreSQL 16
-- **AI Engine**: Google Gemini 3 Flash Preview (via Google Gen AI SDK)
-- **PDF Processing**: pdfplumber (for text extraction) + Gemini (for parsing)
+- **PDF Processing**: pdfplumber (for text extraction) + deterministic parsing
 - **Language**: Python 3.12
 
 ### Frontend
@@ -35,7 +34,7 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 
 ## Project Structure
 
-- `app/` - FastAPI application with scraping logic, AI integration, database models, and Jinja2 templates.
+- `app/` - FastAPI application with scraping logic, database models, and Jinja2 templates.
 - `docs/` - Project documentation, requirements, and architecture.
 
 ## Getting Started

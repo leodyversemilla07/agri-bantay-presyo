@@ -98,6 +98,8 @@ def sample_price_entry(db_session, sample_commodity, sample_market):
         price_high=Decimal("55.00"),
         price_prevailing=Decimal("50.00"),
         price_average=Decimal("50.00"),
+        period_start=date(2025, 1, 1),
+        period_end=date(2025, 1, 15),
         report_type="DAILY_RETAIL",
         source_file="test.pdf",
     )

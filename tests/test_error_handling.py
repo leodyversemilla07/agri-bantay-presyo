@@ -2,15 +2,10 @@
 Tests for error handling and exceptions.
 """
 
-from unittest.mock import patch
-
 import pytest
 
 from app.core.exceptions import (
     AgriBantayError,
-    AIConfigurationError,
-    AIProcessingError,
-    AIRateLimitError,
     DuplicateRecordError,
     InvalidDateRangeError,
     PDFDownloadError,
@@ -61,23 +56,6 @@ class TestCustomExceptions:
         exc = PDFParseError(filename="test.pdf", reason="Invalid format")
         assert "parse" in exc.message.lower()
         assert exc.details["filename"] == "test.pdf"
-
-    def test_ai_processing_error(self):
-        """Test AIProcessingError."""
-        exc = AIProcessingError(service="Gemini", reason="API error")
-        assert "Gemini" in exc.details["service"]
-        assert exc.details["reason"] == "API error"
-
-    def test_ai_rate_limit_error(self):
-        """Test AIRateLimitError."""
-        exc = AIRateLimitError(retry_after=60)
-        assert "rate limit" in exc.message.lower()
-        assert exc.details["retry_after_seconds"] == 60
-
-    def test_ai_configuration_error(self):
-        """Test AIConfigurationError."""
-        exc = AIConfigurationError(reason="API key missing")
-        assert "configuration" in exc.message.lower()
 
     def test_validation_error(self):
         """Test ValidationError."""
@@ -140,38 +118,3 @@ class TestDownloaderErrorHandling:
             downloader.download_pdf_sync("http://localhost:99999/fake.pdf")
 
 
-class TestAIProcessorErrorHandling:
-    """Tests for AIProcessor error handling."""
-
-    def test_ai_disabled_returns_empty(self):
-        """Test that disabled AI returns empty list."""
-        from app.scraper.ai_processor import AIProcessor
-
-        with patch.object(AIProcessor, "__init__", lambda self: None):
-            processor = AIProcessor()
-            processor.enabled = False
-
-            result = processor.process_messy_rows("test", "2025-01-20")
-            assert result == []
-
-    def test_ai_short_input_returns_empty(self):
-        """Test that very short input returns empty."""
-        from app.scraper.ai_processor import AIProcessor
-
-        with patch.object(AIProcessor, "__init__", lambda self: None):
-            processor = AIProcessor()
-            processor.enabled = True
-
-            result = processor.process_messy_rows("short", "2025-01-20")
-            assert result == []
-
-    def test_normalize_empty_name_returns_original(self):
-        """Test normalization of empty name."""
-        from app.scraper.ai_processor import AIProcessor
-
-        with patch.object(AIProcessor, "__init__", lambda self: None):
-            processor = AIProcessor()
-            processor.enabled = True
-
-            result = processor.normalize_commodity_name("")
-            assert result == ""

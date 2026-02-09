@@ -4,17 +4,16 @@
 ## Tech Stack
 *   **Backend API:** FastAPI (Python) - High performance; async support.
 *   **Database:** PostgreSQL - Relational data storage.
-*   **AI Engine:** Google Gemini Flash - For intelligent PDF table parsing.
+*   **PDF Parsing:** Deterministic, layout-aware extraction for PDF tables.
 *   **Frontend:** Jinja2 Templates + Tailwind CSS + Alpine.js + HTMX.
 
 ## Scraper & Data Ingestion Logic
 
 1.  **Source Acquisition**: The system scrapes the DA-AMAS website for Daily Retail Price Range PDF links.
 2.  **Queue Management**: Links are tracked to avoid duplicate processing.
-3.  **AI-Powered Parsing**:
+3.  **Deterministic Parsing**:
     *   PDF text is extracted using `pdfplumber`.
-    *   Raw text is sent to **Google Gemini** with a structured prompt.
-    *   Gemini returns clean JSON with price ranges (low/high/prevailing).
+    *   Layout-aware heuristics derive structured price ranges.
 4.  **Persistence**: Data is upserted into the `PriceEntry` table.
 5.  **Automation**: Celery tasks run daily to check for new reports.
 
@@ -26,7 +25,7 @@ graph TD
     B -->|Next URL| C{Processor}
     C -->|Download PDF| D[Raw PDF]
     D -->|pdfplumber| E[Raw Text]
-    E -->|Prompt Engineering| F[Google Gemini Flash]
+    E -->|Layout Heuristics| F[Deterministic Parser]
     F -->|Structured JSON| G[Price Data]
     G -->|Upsert| H[(PostgreSQL)]
     H -->|Query| I[FastAPI + Jinja2 UI]

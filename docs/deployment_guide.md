@@ -27,13 +27,6 @@ This guide covers deploying the Agri Bantay Presyo application for both developm
 | PostgreSQL | 16+ | Database (manual deployment) |
 | Redis | 7+ | Message broker for Celery |
 
-### API Keys
-
-- **Google Gemini API Key** - Required for AI-powered PDF parsing
-  - Get your key at: https://aistudio.google.com/apikey
-
----
-
 ## Environment Variables
 
 Create a `.env` file in the project root:
@@ -49,8 +42,6 @@ POSTGRES_DB=bantay_presyo
 # Redis
 REDIS_URL=redis://localhost:6379/0
 
-# AI Processing (Required)
-GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### Variable Descriptions
@@ -59,7 +50,6 @@ GEMINI_API_KEY=your_gemini_api_key_here
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `REDIS_URL` | Yes | Redis connection string for Celery |
-| `GEMINI_API_KEY` | Yes | Google Gemini API key for PDF parsing |
 | `POSTGRES_SERVER` | No | PostgreSQL host (default: localhost) |
 | `POSTGRES_USER` | No | PostgreSQL user (default: postgres) |
 | `POSTGRES_PASSWORD` | No | PostgreSQL password (default: password) |
@@ -76,48 +66,54 @@ git clone https://github.com/leodyversemilla07/agri-bantay-presyo.git
 cd agri-bantay-presyo
 ```
 
-### 2. Set Environment Variables
-
-```bash
-# Windows (PowerShell)
-$env:GEMINI_API_KEY="your_api_key_here"
-
-# Linux/macOS
-export GEMINI_API_KEY="your_api_key_here"
-```
-
-Or create a `.env` file:
-
-```bash
-echo "GEMINI_API_KEY=your_api_key_here" > .env
-```
-
-### 3. Start All Services
+### 2. Start Infrastructure Services
 
 ```bash
 docker-compose up -d
 ```
 
-This starts 5 services:
+This starts 2 services:
 - **db** - PostgreSQL 16 database (port 5432)
 - **redis** - Redis 7 message broker (port 6379)
-- **app** - FastAPI application (port 8000)
-- **celery-worker** - Background task processor
-- **celery-beat** - Scheduled task scheduler
 
-### 4. Run Database Migrations
+### 3. Run the Application Locally
 
 ```bash
-docker-compose exec app alembic upgrade head
-```
+# Create virtual environment
+python -m venv venv
 
-### 5. Seed Initial Data (Optional)
+# Activate virtual environment
+# Windows
+venv\Scripts\activate
+# Linux/macOS
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
 
 ```bash
-docker-compose exec app python -c "from app.db.seed import seed_initial_data; seed_initial_data()"
+# Run migrations
+alembic upgrade head
+
+# Optional seed
+python -c "from app.db.seed import seed_initial_data; seed_initial_data()"
 ```
 
-### 6. Access the Application
+```bash
+# Start API
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+```bash
+# Start Celery worker (separate terminal)
+celery -A app.core.celery_app worker --loglevel=info
+
+# Start Celery beat (separate terminal)
+celery -A app.core.celery_app beat --loglevel=info
+```
+
+### 4. Access the Application
 
 - **Web Interface**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
@@ -249,7 +245,6 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - db
       - redis
@@ -261,7 +256,6 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - db
       - redis
@@ -273,7 +267,6 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - db
       - redis
@@ -320,12 +313,11 @@ sudo certbot --nginx -d your-domain.com
 
 ### Environment Variables (Production)
 
-For production, use strong passwords and secure your API keys:
+For production, use strong passwords and secure your environment variables:
 
 ```env
 DATABASE_URL=postgresql://bantay_user:STRONG_PASSWORD_HERE@db:5432/bantay_presyo
 REDIS_URL=redis://redis:6379/0
-GEMINI_API_KEY=your_production_api_key
 ```
 
 ---
@@ -339,11 +331,8 @@ GEMINI_API_KEY=your_production_api_key
 docker-compose logs -f
 
 # Specific service
-docker-compose logs -f app
-docker-compose logs -f celery-worker
-
-# Last 100 lines
-docker-compose logs --tail=100 app
+docker-compose logs -f db
+docker-compose logs -f redis
 ```
 
 ### Check Service Health
@@ -373,8 +362,8 @@ cat backup_20260110.sql | docker-compose exec -T db psql -U postgres bantay_pres
 docker-compose restart
 
 # Restart specific service
-docker-compose restart app
-docker-compose restart celery-worker
+docker-compose restart db
+docker-compose restart redis
 ```
 
 ### Update Application
@@ -383,11 +372,14 @@ docker-compose restart celery-worker
 # Pull latest changes
 git pull origin main
 
-# Rebuild and restart
-docker-compose up -d --build
+# Rebuild and restart infrastructure
+docker-compose up -d
+
+# Update local dependencies
+pip install -r requirements.txt
 
 # Run any new migrations
-docker-compose exec app alembic upgrade head
+alembic upgrade head
 ```
 
 ---
@@ -403,7 +395,7 @@ The application uses Celery Beat to run scheduled tasks:
 To manually trigger PDF discovery:
 
 ```bash
-docker-compose exec app python -c "
+python -c "
 from app.scraper.discovery import discover_new_pdfs
 discover_new_pdfs()
 "
@@ -443,23 +435,7 @@ redis.exceptions.ConnectionError: Connection refused
 docker-compose restart redis
 ```
 
-#### 3. Gemini API Error
-
-```
-google.genai.errors.APIError: API key not valid
-```
-
-**Solution**: Verify your GEMINI_API_KEY is set correctly.
-
-```bash
-# Check if env variable is set
-echo $GEMINI_API_KEY
-
-# Or in Docker
-docker-compose exec app printenv GEMINI_API_KEY
-```
-
-#### 4. Migration Errors
+#### 3. Migration Errors
 
 ```
 alembic.util.exc.CommandError: Can't locate revision
@@ -469,11 +445,11 @@ alembic.util.exc.CommandError: Can't locate revision
 
 ```bash
 # Stamp current state
-docker-compose exec app alembic stamp head
+alembic stamp head
 
 # Or fresh start (CAUTION: drops all data)
-docker-compose exec app alembic downgrade base
-docker-compose exec app alembic upgrade head
+alembic downgrade base
+alembic upgrade head
 ```
 
 #### 5. Port Already in Use
@@ -500,14 +476,11 @@ ports:
 # View container resource usage
 docker stats
 
-# Enter container shell
-docker-compose exec app bash
-
 # Check database contents
-docker-compose exec app python scripts/show_data.py
+python scripts/show_data.py
 
 # Wipe database (CAUTION!)
-docker-compose exec app python scripts/wipe_db.py
+python scripts/wipe_db.py
 ```
 
 ---
@@ -550,17 +523,13 @@ docker-compose exec app python scripts/wipe_db.py
                               ▼                                 ▼
                    ┌─────────────────────┐        ┌─────────────────────┐
                    │   Celery Worker     │        │   Celery Beat       │
-                   │                     │        │                     │
+                   │  (optional local)   │        │  (optional local)   │
                    │  - PDF Download     │        │  - Schedule Tasks   │
-                   │  - AI Processing    │        │  - Daily Discovery  │
+                   │  - Parsing          │        │  - Daily Discovery  │
                    │  - Data Ingestion   │        │                     │
                    └─────────────────────┘        └─────────────────────┘
                               │
                               ▼
-                   ┌─────────────────────┐
-                   │   Google Gemini AI  │
-                   │   (PDF Parsing)     │
-                   └─────────────────────┘
 ```
 
 ---

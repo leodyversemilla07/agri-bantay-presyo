@@ -5,9 +5,12 @@ Tests for scraper components (parser, downloader, source).
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+from datetime import date, datetime
+
 from app.scraper.downloader import PDFDownloader
 from app.scraper.parser import PriceParser
 from app.scraper.source import MonitoringSource
+from app.scraper.tasks import _normalize_report_date
 
 
 class TestPriceParser:
@@ -196,3 +199,20 @@ class TestMonitoringSource:
 
             assert len(result) == 1
             assert "file3.pdf" in result[0]
+
+
+class TestReportDateNormalization:
+    """Tests for report date normalization."""
+
+    def test_normalize_report_date_date(self):
+        assert _normalize_report_date(date(2025, 1, 20)) == date(2025, 1, 20)
+
+    def test_normalize_report_date_datetime(self):
+        dt = datetime(2025, 1, 20, 10, 30, 0)
+        assert _normalize_report_date(dt) == date(2025, 1, 20)
+
+    def test_normalize_report_date_iso_string(self):
+        assert _normalize_report_date("2025-01-20") == date(2025, 1, 20)
+
+    def test_normalize_report_date_invalid(self):
+        assert _normalize_report_date("not-a-date") is None

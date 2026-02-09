@@ -124,6 +124,8 @@ class TestPricesAPI:
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
+        assert data[0]["period_start"] == "2025-01-01"
+        assert data[0]["period_end"] == "2025-01-15"
 
     def test_get_daily_prices_by_date(self, client, sample_price_entry):
         """Test getting prices for a specific date."""

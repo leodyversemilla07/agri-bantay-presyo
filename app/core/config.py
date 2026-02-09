@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "bantay_presyo"
     DATABASE_URL: Optional[str] = None
     REDIS_URL: str = "redis://localhost:6379/0"
-    GEMINI_API_KEY: Optional[str] = None
 
     # Authentication
     API_KEY: Optional[str] = None  # Optional API key for protected endpoints
