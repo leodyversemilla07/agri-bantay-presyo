@@ -48,6 +48,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +89,7 @@ jobs:
       - name: Run tests with coverage
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bantay_presyo_test
+          REDIS_URL: redis://localhost:6379/0
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing
