@@ -7,25 +7,50 @@ from sqlalchemy.orm import Session
 from app.api.deps import PaginationParams, get_pagination_params
 from app.core.rate_limiter import limiter
 from app.db.session import get_db
+from app.schemas.pagination import PaginatedResponse
 from app.schemas.price_entry import PriceEntry
 from app.services.price_service import PriceService
 
 router = APIRouter()
 
 
-@router.get("/daily", response_model=List[PriceEntry])
+def _fetch_prices(
+    db: Session,
+    report_date: Optional[date],
+    pagination: PaginationParams,
+) -> List[PriceEntry]:
+    if not report_date:
+        return PriceService.get_latest_prices(db, skip=pagination.skip, limit=pagination.limit)
+    return PriceService.get_prices_by_date(
+        db,
+        report_date=report_date,
+        skip=pagination.skip,
+        limit=pagination.limit,
+    )
+
+
+@router.get("/", response_model=PaginatedResponse[PriceEntry])
 @limiter.limit("200/minute")
-def get_daily_prices(
+def get_prices(
     request: Request,
     report_date: Optional[date] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
     db: Session = Depends(get_db),
 ):
-    if not report_date:
-        prices = PriceService.get_latest_prices(db, skip=pagination.skip, limit=pagination.limit)
-    else:
-        prices = PriceService.get_prices_by_date(db, report_date=report_date)
-    return prices
+    prices = _fetch_prices(db, report_date=report_date, pagination=pagination)
+    total = PriceService.count_prices(db, report_date=report_date)
+    return {"items": prices, "total": total, "skip": pagination.skip, "limit": pagination.limit}
+
+
+@router.get("/daily", response_model=List[PriceEntry], include_in_schema=False)
+@limiter.limit("200/minute")
+def get_daily_prices_legacy(
+    request: Request,
+    report_date: Optional[date] = None,
+    pagination: PaginationParams = Depends(get_pagination_params),
+    db: Session = Depends(get_db),
+):
+    return _fetch_prices(db, report_date=report_date, pagination=pagination)
 
 
 @router.get("/export")

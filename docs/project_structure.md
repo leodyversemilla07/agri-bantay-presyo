@@ -16,7 +16,6 @@ graph TD
     App --> Schemas[schemas/]
     App --> Services[services/]
     App --> Scraper[scraper/]
-    App --> Templates[templates/]
 ```
 
 ## Root Directory
@@ -24,7 +23,7 @@ graph TD
 /
 ├── app/                    # FastAPI Application
 │   ├── api/                # API Route Definitions
-│   │   ├── views.py        # Jinja2 template views (Home, Markets, Analytics)
+│   │   ├── meta.py         # Root metadata and health routes
 │   │   └── v1/             # API endpoints
 │   ├── core/               # Core Config (Settings, Security)
 │   ├── db/                 # Database Connection & Bases
@@ -32,8 +31,6 @@ graph TD
 │   ├── schemas/            # Pydantic Schemas (Request/Response)
 │   ├── services/           # Business Logic (CRUD, etc.)
 │   ├── scraper/            # PDF Extraction Logic (Deterministic)
-│   ├── templates/          # Jinja2 Templates (Home, Markets, Analytics)
-│   ├── static/             # Static assets
 │   └── main.py             # App Entry Point
 ├── scripts/                # Standalone Scripts (Backfill, Utilities)
 ├── tests/                  # Pytest Tests
@@ -52,8 +49,8 @@ graph TD
 | Directory | Purpose |
 | :--- | :--- |
 | `main.py` | The entry point of the application. Initializes the `FastAPI` app instance. |
-| `api/` | Contains all API route handlers and template views. |
-| `api/views.py` | **Template Views**. Jinja2-rendered pages (Home, Markets, Analytics). |
+| `api/` | Contains root metadata routes and versioned API route handlers. |
+| `api/meta.py` | API root metadata and health-check endpoints. |
 | `api/v1/endpoints/` | Specific API versioned endpoints (e.g., `prices.py`, `commodities.py`). |
 | `core/` | Configuration files (e.g., `config.py` for env vars, security settings). |
 | `db/` | Database setup. `session.py` (engine creation), `base.py` (SQLAlchemy base). |
@@ -61,12 +58,10 @@ graph TD
 | `schemas/` | **Data Validation**. Pydantic models for API request/response bodies. |
 | `services/` | Reusable business logic separate from routes. |
 | `scraper/` | Deterministic parser. Logic for processing PDFs using layout-aware extraction. |
-| `templates/` | **Jinja2 Templates**. Server-rendered HTML pages. |
-| `static/` | Static files (CSS, JS, images). |
 
 ## Key FastAPI Patterns Used
 
 *   **Separation of Concerns:** Routes (`api`) are separate from database models (`models`) and validation schemas (`schemas`).
 *   **Dependency Injection:** Database sessions and settings are injected into routes.
 *   **Versioned APIs:** `api/v1` allows for future updates without breaking existing clients.
-*   **Template Views:** Server-rendered pages using Jinja2 with Alpine.js and HTMX for interactivity.
+*   **API Metadata Endpoints:** `/` and `/health` provide service discovery and uptime checks.

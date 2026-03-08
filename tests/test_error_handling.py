@@ -80,9 +80,13 @@ class TestExceptionHandlers:
         response = client.get("/api/v1/commodities/00000000-0000-0000-0000-000000000000")
         assert response.status_code == 404
 
-    def test_create_duplicate_returns_400(self, client, sample_commodity):
+    def test_create_duplicate_returns_400(self, client, sample_commodity, auth_headers):
         """Test that duplicate creation returns error."""
-        response = client.post("/api/v1/commodities/", json={"name": sample_commodity.name, "category": "Test"})
+        response = client.post(
+            "/api/v1/commodities/",
+            json={"name": sample_commodity.name, "category": "Test"},
+            headers=auth_headers,
+        )
         assert response.status_code == 400
 
     def test_invalid_endpoint_returns_404(self, client):

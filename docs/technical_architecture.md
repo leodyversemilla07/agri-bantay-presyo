@@ -5,7 +5,7 @@
 *   **Backend API:** FastAPI (Python) - High performance; async support.
 *   **Database:** PostgreSQL - Relational data storage.
 *   **PDF Parsing:** Deterministic, layout-aware extraction for PDF tables.
-*   **Frontend:** Jinja2 Templates + Tailwind CSS + Alpine.js + HTMX.
+*   **API Style:** REST API with OpenAPI schema and interactive docs.
 
 ## Scraper & Data Ingestion Logic
 
@@ -28,14 +28,14 @@ graph TD
     E -->|Layout Heuristics| F[Deterministic Parser]
     F -->|Structured JSON| G[Price Data]
     G -->|Upsert| H[(PostgreSQL)]
-    H -->|Query| I[FastAPI + Jinja2 UI]
+    H -->|Query| I[FastAPI REST API]
 ```
 
 ## What's Included
 - Daily Retail Price Range PDF parsing
 - Basic commodity/market storage
-- Interactive dashboard
 - REST API endpoints
+- OpenAPI documentation and health endpoints
 
 ## What's NOT Included (v2.0)
 - Weekly Average PDF parsing

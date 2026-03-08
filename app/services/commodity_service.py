@@ -9,6 +9,15 @@ from app.schemas.commodity import CommodityCreate
 
 class CommodityService:
     @staticmethod
+    def _base_query(db: Session, category: Optional[str] = None, search: Optional[str] = None):
+        db_query = db.query(Commodity)
+        if category:
+            db_query = db_query.filter(Commodity.category == category)
+        if search:
+            db_query = db_query.filter(Commodity.name.ilike(f"%{search}%"))
+        return db_query
+
+    @staticmethod
     def get(db: Session, commodity_id: Union[str, UUID]) -> Optional[Commodity]:
         # Convert string to UUID if needed
         if isinstance(commodity_id, str):
@@ -20,11 +29,18 @@ class CommodityService:
         return db.query(Commodity).filter(Commodity.name == name).first()
 
     @staticmethod
-    def get_multi(db: Session, skip: int = 0, limit: int = 100, category: Optional[str] = None) -> List[Commodity]:
-        query = db.query(Commodity)
-        if category:
-            query = query.filter(Commodity.category == category)
-        return query.offset(skip).limit(limit).all()
+    def get_multi(
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        category: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[Commodity]:
+        return CommodityService._base_query(db, category=category, search=search).offset(skip).limit(limit).all()
+
+    @staticmethod
+    def count_multi(db: Session, category: Optional[str] = None, search: Optional[str] = None) -> int:
+        return CommodityService._base_query(db, category=category, search=search).count()
 
     @staticmethod
     def create(db: Session, obj_in: CommodityCreate) -> Commodity:

@@ -7,11 +7,11 @@
 
 Agri Bantay Presyo is a modernized agricultural price monitoring system designed to centralize and automate the collection of commodity price data from scattered government PDF reports in the Philippines. The platform scrapes data from Department of Agriculture - Agricultural Marketing Assistance Service (DA-AMAS) sources and uses deterministic, layout-aware parsing for PDF extraction. Data is stored in a structured PostgreSQL database for easy querying and analysis.
 
-Built as a full-stack web application, it features:
-- **Backend**: FastAPI (Python) with deterministic PDF processing, robust data standardization, RESTful API endpoints, and server-rendered Jinja2 templates.
+Built as an API-first backend service, it features:
+- **Backend**: FastAPI (Python) with deterministic PDF processing, robust data standardization, and RESTful API endpoints.
 - **Data Processing**: Intelligent mapping of commodity names, automated backfilling of historical data (2018-Present), and conflict resolution for duplicate entries.
 
-The system provides farmers, consumers, policymakers, and developers with real-time access to agricultural price trends, enabling better decision-making and research through an open API and user-friendly visualization tools.
+The system provides farmers, consumers, policymakers, and developers with real-time access to agricultural price trends through an open API suitable for web, mobile, and analytics clients.
 
 ## Tech Stack
 
@@ -21,12 +21,6 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 - **PDF Processing**: pdfplumber (for text extraction) + deterministic parsing
 - **Language**: Python 3.12
 
-### Frontend
-- **Framework**: Jinja2 Templates (Server-rendered)
-- **Styling**: Tailwind CSS
-- **Interactivity**: Alpine.js + HTMX
-- **Charts**: Chart.js
-
 ### Infrastructure
 - **Containerization**: Docker & Docker Compose
 - **Version Control**: Git
@@ -34,7 +28,7 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 
 ## Project Structure
 
-- `app/` - FastAPI application with scraping logic, database models, and Jinja2 templates.
+- `app/` - FastAPI application with scraping logic, database models, and REST API routes.
 - `docs/` - Project documentation, requirements, and architecture.
 
 ## Getting Started
@@ -60,9 +54,25 @@ The system provides farmers, consumers, policymakers, and developers with real-t
    ```
 
 4. Access the application:
-   - **Web UI**: http://localhost:8000
+   - **API Root**: http://localhost:8000/
    - **Backend API**: http://localhost:8000/api/v1
    - **API Documentation**: http://localhost:8000/docs
+
+### Core REST Endpoints
+
+- `GET /health` - Service health check
+- `GET /api/v1/commodities` - Paginated commodities with `items`, `total`, `skip`, `limit`; filter with `category` or search with `q`
+- `GET /api/v1/commodities/{commodity_id}/history` - Commodity price history
+- `GET /api/v1/markets` - Paginated markets with `items`, `total`, `skip`, `limit`; search with `q`
+- `GET /api/v1/prices` - Paginated latest or date-filtered prices
+- `GET /api/v1/prices/export` - Export prices as CSV
+- `POST /api/v1/commodities` and `POST /api/v1/markets` - Create resources, returning `201 Created`; requires `X-API-Key`
+
+### Authentication
+
+- Protected write routes require the `X-API-Key` header.
+- Configure the server-side key with `API_KEY` in `.env`.
+- Example: `X-API-Key: your-secret-key`
 
 ## Deployment
 

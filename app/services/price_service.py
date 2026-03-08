@@ -8,28 +8,29 @@ from sqlalchemy.orm import Session, joinedload
 
 class PriceService:
     @staticmethod
-    def get_latest_prices(db: Session, skip: int = 0, limit: int = 100):
+    def _base_query(db: Session, report_date: date | None = None):
         from app.models.price_entry import PriceEntry
 
-        return (
+        db_query = (
             db.query(PriceEntry)
             .options(joinedload(PriceEntry.commodity), joinedload(PriceEntry.market))
             .order_by(desc(PriceEntry.report_date))
-            .offset(skip)
-            .limit(limit)
-            .all()
         )
+        if report_date:
+            db_query = db_query.filter(PriceEntry.report_date == report_date)
+        return db_query
 
     @staticmethod
-    def get_prices_by_date(db: Session, report_date: date):
-        from app.models.price_entry import PriceEntry
+    def get_latest_prices(db: Session, skip: int = 0, limit: int = 100):
+        return PriceService._base_query(db).offset(skip).limit(limit).all()
 
-        return (
-            db.query(PriceEntry)
-            .options(joinedload(PriceEntry.commodity), joinedload(PriceEntry.market))
-            .filter(PriceEntry.report_date == report_date)
-            .all()
-        )
+    @staticmethod
+    def get_prices_by_date(db: Session, report_date: date, skip: int = 0, limit: int = 100):
+        return PriceService._base_query(db, report_date=report_date).offset(skip).limit(limit).all()
+
+    @staticmethod
+    def count_prices(db: Session, report_date: date | None = None) -> int:
+        return PriceService._base_query(db, report_date=report_date).count()
 
     @staticmethod
     def get_commodity_history(db: Session, commodity_id: Union[str, UUID], limit: int = 30):

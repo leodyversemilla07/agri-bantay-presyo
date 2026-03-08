@@ -1,9 +1,12 @@
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException, Query, Request, status
+from fastapi import Depends, HTTPException, Query, Request, Security, status
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
 from app.core.config import settings
+
+api_key_header = APIKeyHeader(name=settings.API_KEY_HEADER, auto_error=False)
 
 
 class PaginationParams(BaseModel):
@@ -19,36 +22,37 @@ def get_pagination_params(
 
 
 async def verify_api_key(
-    x_api_key: Optional[str] = Header(None, alias=settings.API_KEY_HEADER)
+    x_api_key: Optional[str] = Security(api_key_header)
 ) -> bool:
     """
     Verify API key for protected endpoints.
-    
-    If API_KEY is not set in settings, authentication is disabled (returns True).
-    If API_KEY is set, the request must include a valid API key header.
+
+    Protected write endpoints require a configured API key and a matching request header.
     """
-    # If no API key is configured, allow all requests (development mode)
     if not settings.API_KEY:
-        return True
-    
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="API key authentication is not configured on the server",
+        )
+
     if not x_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key required",
             headers={"WWW-Authenticate": "ApiKey"},
         )
-    
+
     if x_api_key != settings.API_KEY:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid API key",
         )
-    
+
     return True
 
 
 async def optional_api_key(
-    x_api_key: Optional[str] = Header(None, alias=settings.API_KEY_HEADER)
+    x_api_key: Optional[str] = Security(api_key_header)
 ) -> Optional[str]:
     """
     Optional API key verification - returns the key if valid, None if not provided.
@@ -59,7 +63,7 @@ async def optional_api_key(
     
     if settings.API_KEY and x_api_key == settings.API_KEY:
         return x_api_key
-    
+
     return None
 
 

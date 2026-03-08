@@ -8,6 +8,15 @@ from app.schemas.market import MarketCreate
 
 class MarketService:
     @staticmethod
+    def _base_query(db: Session, query: str | None = None):
+        from app.models.market import Market
+
+        db_query = db.query(Market)
+        if query:
+            db_query = db_query.filter(Market.name.ilike(f"%{query}%"))
+        return db_query
+
+    @staticmethod
     def get(db: Session, market_id: Union[str, UUID]):
         from app.models.market import Market
 
@@ -23,10 +32,12 @@ class MarketService:
         return db.query(Market).filter(Market.name == name).first()
 
     @staticmethod
-    def get_multi(db: Session, skip: int = 0, limit: int = 100):
-        from app.models.market import Market
+    def get_multi(db: Session, skip: int = 0, limit: int = 100, query: str | None = None):
+        return MarketService._base_query(db, query=query).offset(skip).limit(limit).all()
 
-        return db.query(Market).offset(skip).limit(limit).all()
+    @staticmethod
+    def count_multi(db: Session, query: str | None = None) -> int:
+        return MarketService._base_query(db, query=query).count()
 
     @staticmethod
     def create(db: Session, obj_in: MarketCreate):

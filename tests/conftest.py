@@ -14,11 +14,30 @@ from app.db.base_class import Base
 from app.db.session import get_db
 from app.main import app
 
+TEST_API_KEY = "test-api-key"
+
 # Use PostgreSQL for testing - use test database or same as app
 SQLALCHEMY_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.sync_database_url)
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def configure_test_api_key():
+    """Ensure protected write endpoints require a deterministic test API key."""
+    original_api_key = settings.API_KEY
+    settings.API_KEY = TEST_API_KEY
+    try:
+        yield
+    finally:
+        settings.API_KEY = original_api_key
+
+
+@pytest.fixture
+def auth_headers():
+    """Headers for authenticated write requests."""
+    return {settings.API_KEY_HEADER: TEST_API_KEY}
 
 
 @pytest.fixture(scope="function")

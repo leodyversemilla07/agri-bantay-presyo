@@ -1,14 +1,17 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.rate_limiter import limiter
 from app.db.session import get_db
+from app.schemas.price_entry import PriceEntry
 from app.services.price_service import PriceService
 
 router = APIRouter()
 
 
-@router.get("/history/{commodity_id}")
+@router.get("/history/{commodity_id}", response_model=List[PriceEntry], include_in_schema=False)
 @limiter.limit("100/minute")
 def get_commodity_history(
     request: Request, commodity_id: str, limit: int = 30, db: Session = Depends(get_db)
