@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Query, Request, Security, status
+from fastapi import HTTPException, Query, Security, status
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
@@ -22,7 +22,7 @@ def get_pagination_params(
 
 
 async def verify_api_key(
-    x_api_key: Optional[str] = Security(api_key_header)
+    x_api_key: Optional[str] = Security(api_key_header),
 ) -> bool:
     """
     Verify API key for protected endpoints.
@@ -52,7 +52,7 @@ async def verify_api_key(
 
 
 async def optional_api_key(
-    x_api_key: Optional[str] = Security(api_key_header)
+    x_api_key: Optional[str] = Security(api_key_header),
 ) -> Optional[str]:
     """
     Optional API key verification - returns the key if valid, None if not provided.
@@ -60,7 +60,7 @@ async def optional_api_key(
     """
     if not x_api_key:
         return None
-    
+
     if settings.API_KEY and x_api_key == settings.API_KEY:
         return x_api_key
 
@@ -69,7 +69,7 @@ async def optional_api_key(
 
 class RateLimitExceeded(HTTPException):
     """Custom exception for rate limit exceeded."""
-    
+
     def __init__(self, retry_after: int = 60):
         super().__init__(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

@@ -2,10 +2,9 @@
 Tests for scraper components (parser, downloader, source).
 """
 
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
-
-from datetime import date, datetime
 
 from app.scraper.downloader import PDFDownloader
 from app.scraper.parser import PriceParser
