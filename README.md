@@ -36,24 +36,34 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 ### Prerequisites
 - **Docker** and **Docker Compose** (for local development)
 - **Python 3.12+** (for backend development)
-- **PostgreSQL** (handled by Docker, or install locally for development)
+- **PostgreSQL** (optional if you use Docker for infrastructure)
 
 ### Local Development
 
 1. Clone the repository
-2. Run the stack with Docker Compose:
+2. Start infrastructure services:
    ```bash
-   docker-compose up --build
+   docker-compose up -d
    ```
-3. Or run services individually:
-
-   **Backend:**
+3. Install Python dependencies and run the API:
    ```bash
    pip install -r requirements.txt
+   alembic upgrade head
    uvicorn app.main:app --reload
    ```
+4. Optional: run Celery processes in separate terminals:
+   ```bash
+   celery -A app.core.celery_app worker --loglevel=info
+   celery -A app.core.celery_app beat --loglevel=info
+   ```
+   On Windows, the app defaults the worker to a `solo` pool and uses a local beat schedule file automatically.
+5. Run the test suite:
+   ```bash
+   pytest -q
+   ```
+   Tests default to in-memory SQLite and do not require local PostgreSQL or Redis.
 
-4. Access the application:
+6. Access the application:
    - **API Root**: http://localhost:8000/
    - **Backend API**: http://localhost:8000/api/v1
    - **API Documentation**: http://localhost:8000/docs
@@ -72,6 +82,7 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 
 - Protected write routes require the `X-API-Key` header.
 - Configure the server-side key with `API_KEY` in `.env`.
+- Rate limiting uses in-memory storage by default for local development. Set `RATE_LIMIT_STORAGE_URL` to a Redis URL for shared/distributed rate limits.
 - Example: `X-API-Key: your-secret-key`
 
 ## Deployment

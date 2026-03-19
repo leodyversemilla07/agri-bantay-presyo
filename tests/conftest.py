@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
 from app.db.base_class import Base
@@ -16,10 +17,16 @@ from app.main import app
 
 TEST_API_KEY = "test-api-key"
 
-# Use PostgreSQL for testing - use test database or same as app
-SQLALCHEMY_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", settings.sync_database_url)
+# Default to in-memory SQLite for tests so the suite does not depend on a local
+# PostgreSQL instance. TEST_DATABASE_URL can still override this when needed.
+SQLALCHEMY_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite://")
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
+engine_kwargs = {"pool_pre_ping": True}
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+    engine_kwargs["poolclass"] = StaticPool
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_kwargs)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

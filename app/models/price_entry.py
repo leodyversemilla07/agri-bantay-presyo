@@ -1,17 +1,18 @@
 import uuid
 
-from sqlalchemy import UUID, Column, Date, ForeignKey, Numeric, String
+from sqlalchemy import Column, Date, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
+from app.db.types import GUID
 
 
 class PriceEntry(Base):
     __tablename__ = "price_entries"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    commodity_id = Column(UUID(as_uuid=True), ForeignKey("commodities.id"), nullable=False)
-    market_id = Column(UUID(as_uuid=True), ForeignKey("markets.id"), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    commodity_id = Column(GUID(), ForeignKey("commodities.id"), nullable=False)
+    market_id = Column(GUID(), ForeignKey("markets.id"), nullable=False)
     report_date = Column(Date, index=True, nullable=False)
 
     price_low = Column(Numeric(10, 2))
@@ -23,6 +24,16 @@ class PriceEntry(Base):
 
     report_type = Column(String, index=True, default="DAILY_RETAIL")
     source_file = Column(String)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "commodity_id",
+            "market_id",
+            "report_date",
+            "report_type",
+            name="uq_price_entries_identity",
+        ),
+    )
 
     commodity = relationship("Commodity", back_populates="price_entries")
     market = relationship("Market")

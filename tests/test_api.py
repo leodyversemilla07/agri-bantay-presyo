@@ -2,6 +2,11 @@
 Tests for API endpoints.
 """
 
+from datetime import date
+from decimal import Decimal
+
+from app.models.price_entry import PriceEntry
+
 
 class TestCommoditiesAPI:
     """Tests for /api/v1/commodities endpoints."""
@@ -40,6 +45,16 @@ class TestCommoditiesAPI:
         response = client.post(
             "/api/v1/commodities/",
             json={"name": sample_commodity.name, "category": "Rice"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 400
+        assert "already exists" in response.json()["detail"]
+
+    def test_create_duplicate_commodity_case_insensitive(self, client, sample_commodity, auth_headers):
+        """Test creating a duplicate commodity with different case returns error."""
+        response = client.post(
+            "/api/v1/commodities/",
+            json={"name": sample_commodity.name.lower(), "category": "Rice"},
             headers=auth_headers,
         )
         assert response.status_code == 400
@@ -145,6 +160,15 @@ class TestMarketsAPI:
         )
         assert response.status_code == 400
 
+    def test_create_duplicate_market_case_insensitive(self, client, sample_market, auth_headers):
+        """Test creating a duplicate market with different case returns error."""
+        response = client.post(
+            "/api/v1/markets/",
+            json={"name": sample_market.name.lower(), "region": "NCR"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 400
+
     def test_create_market_requires_api_key(self, client):
         """Test creating a market without an API key is rejected."""
         response = client.post("/api/v1/markets/", json={"name": "Divisoria Market", "region": "NCR", "city": "Manila"})
@@ -196,12 +220,48 @@ class TestPricesAPI:
         data = response.json()
         assert len(data["items"]) == 1
 
+    def test_get_daily_prices_defaults_to_latest_snapshot(self, client, db_session, sample_price_entry):
+        """Test latest prices without a date only returns the latest report snapshot."""
+        latest_entry = PriceEntry(
+            commodity_id=sample_price_entry.commodity_id,
+            market_id=sample_price_entry.market_id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("60.00"),
+            report_type="DAILY_RETAIL",
+        )
+        db_session.add(latest_entry)
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["report_date"] == "2025-01-20"
+
     def test_export_prices_csv(self, client, sample_price_entry):
         """Test exporting prices as CSV."""
         response = client.get("/api/v1/prices/export")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
         assert "Commodity" in response.text
+
+    def test_export_prices_csv_defaults_to_latest_snapshot(self, client, db_session, sample_price_entry):
+        """Test CSV export without a date only exports the latest report snapshot."""
+        latest_entry = PriceEntry(
+            commodity_id=sample_price_entry.commodity_id,
+            market_id=sample_price_entry.market_id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("60.00"),
+            report_type="DAILY_RETAIL",
+        )
+        db_session.add(latest_entry)
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/export")
+        assert response.status_code == 200
+        assert "2025-01-20" in response.text
+        assert "2025-01-15" not in response.text
 
 
 class TestStatsAPI:
@@ -223,6 +283,23 @@ class TestStatsAPI:
         data = response.json()
         assert data["commodities"]["count"] == 1
         assert data["markets"]["count"] == 1
+        assert data["prices"]["count"] == 1
+
+    def test_dashboard_stats_prices_count_latest_snapshot_only(self, client, db_session, sample_price_entry):
+        """Test dashboard price count only reflects the latest report snapshot."""
+        latest_entry = PriceEntry(
+            commodity_id=sample_price_entry.commodity_id,
+            market_id=sample_price_entry.market_id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("60.00"),
+            report_type="DAILY_RETAIL",
+        )
+        db_session.add(latest_entry)
+        db_session.commit()
+
+        response = client.get("/api/v1/stats/dashboard")
+        assert response.status_code == 200
+        data = response.json()
         assert data["prices"]["count"] == 1
 
 

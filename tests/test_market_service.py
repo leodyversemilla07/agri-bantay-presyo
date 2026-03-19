@@ -2,6 +2,8 @@
 Unit tests for MarketService.
 """
 
+from sqlalchemy.exc import IntegrityError
+
 from app.models.market import Market
 from app.schemas.market import MarketCreate
 from app.services.market_service import MarketService
@@ -35,6 +37,13 @@ class TestMarketService:
 
         assert result is not None
         assert result.name == sample_market.name
+
+    def test_get_market_by_name_case_insensitive(self, db_session, sample_market):
+        """Test retrieving a market by name is case insensitive."""
+        result = MarketService.get_by_name(db_session, name=sample_market.name.lower())
+
+        assert result is not None
+        assert result.id == sample_market.id
 
     def test_get_market_not_found(self, db_session):
         """Test retrieving a non-existent market returns None."""
@@ -71,6 +80,12 @@ class TestMarketService:
         count = db_session.query(Market).filter(Market.name == sample_market.name).count()
         assert count == 1
 
+    def test_get_or_create_existing_case_insensitive(self, db_session, sample_market):
+        """Test get_or_create reuses an existing market regardless of case."""
+        result = MarketService.get_or_create(db_session, name=sample_market.name.upper())
+
+        assert result.id == sample_market.id
+
     def test_get_or_create_new(self, db_session):
         """Test get_or_create creates new market if not exists."""
         result = MarketService.get_or_create(db_session, name="New Market", region="Region V", city="Legazpi")
@@ -95,3 +110,16 @@ class TestMarketService:
 
         results = MarketService.search(db_session, query="divisoria")
         assert len(results) == 1
+
+    def test_db_enforces_case_insensitive_unique_name(self, db_session):
+        """Test the database rejects duplicate market names that differ only by case."""
+        db_session.add(Market(name="Divisoria Market", region="NCR"))
+        db_session.commit()
+
+        db_session.add(Market(name="divisoria market", region="NCR"))
+        try:
+            db_session.commit()
+        except IntegrityError:
+            db_session.rollback()
+        else:
+            raise AssertionError("Expected case-insensitive unique constraint to reject duplicate market name")

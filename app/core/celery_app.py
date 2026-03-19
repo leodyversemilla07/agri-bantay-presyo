@@ -15,4 +15,8 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="Asia/Manila",
     enable_utc=True,
+    broker_connection_retry_on_startup=True,
+    worker_pool=settings.CELERY_WORKER_POOL,
+    worker_concurrency=settings.CELERY_WORKER_CONCURRENCY,
+    beat_schedule_filename=settings.CELERY_BEAT_SCHEDULE_FILE,
 )

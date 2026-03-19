@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,6 +22,10 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "bantay_presyo"
     DATABASE_URL: Optional[str] = None
     REDIS_URL: str = "redis://localhost:6379/0"
+    RATE_LIMIT_STORAGE_URL: str = "memory://"
+    CELERY_WORKER_POOL: str = "solo" if os.name == "nt" else "prefork"
+    CELERY_WORKER_CONCURRENCY: int = 1 if os.name == "nt" else 4
+    CELERY_BEAT_SCHEDULE_FILE: str = "celerybeat-schedule.local" if os.name == "nt" else "celerybeat-schedule"
 
     # Authentication
     API_KEY: Optional[str] = None  # Optional API key for protected endpoints

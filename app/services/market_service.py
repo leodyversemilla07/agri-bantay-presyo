@@ -1,12 +1,18 @@
 from typing import Union
 from uuid import UUID
 
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.schemas.market import MarketCreate
 
 
 class MarketService:
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        return " ".join(name.split())
+
     @staticmethod
     def _base_query(db: Session, query: str | None = None):
         from app.models.market import Market
@@ -29,7 +35,8 @@ class MarketService:
     def get_by_name(db: Session, name: str):
         from app.models.market import Market
 
-        return db.query(Market).filter(Market.name == name).first()
+        normalized = MarketService._normalize_name(name)
+        return db.query(Market).filter(func.lower(Market.name) == normalized.lower()).first()
 
     @staticmethod
     def get_multi(db: Session, skip: int = 0, limit: int = 100, query: str | None = None):
@@ -43,9 +50,18 @@ class MarketService:
     def create(db: Session, obj_in: MarketCreate):
         from app.models.market import Market
 
-        db_obj = Market(name=obj_in.name, region=obj_in.region, city=obj_in.city)
+        db_obj = Market(
+            name=MarketService._normalize_name(obj_in.name),
+            region=obj_in.region,
+            city=obj_in.city,
+            is_regional_average=obj_in.is_regional_average,
+        )
         db.add(db_obj)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise
         db.refresh(db_obj)
         return db_obj
 
@@ -53,11 +69,19 @@ class MarketService:
     def get_or_create(db: Session, name: str, **kwargs):
         from app.models.market import Market
 
-        market = MarketService.get_by_name(db, name)
+        normalized_name = MarketService._normalize_name(name)
+        market = MarketService.get_by_name(db, normalized_name)
         if not market:
-            db_obj = Market(name=name, **kwargs)
+            db_obj = Market(name=normalized_name, **kwargs)
             db.add(db_obj)
-            db.commit()
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                market = MarketService.get_by_name(db, normalized_name)
+                if market:
+                    return market
+                raise
             db.refresh(db_obj)
             return db_obj
         return market
@@ -67,4 +91,5 @@ class MarketService:
         """Search markets by name (case-insensitive partial match)."""
         from app.models.market import Market
 
-        return db.query(Market).filter(Market.name.ilike(f"%{query}%")).limit(limit).all()
+        normalized = MarketService._normalize_name(query)
+        return db.query(Market).filter(Market.name.ilike(f"%{normalized}%")).limit(limit).all()

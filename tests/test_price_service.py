@@ -5,6 +5,8 @@ Unit tests for PriceService.
 from datetime import date, timedelta
 from decimal import Decimal
 
+from sqlalchemy.exc import IntegrityError
+
 from app.models.price_entry import PriceEntry
 from app.services.price_service import PriceService
 
@@ -69,6 +71,37 @@ class TestPriceService:
 
         assert len(results) == 1
         assert results[0].id == sample_price_entry.id
+
+    def test_get_latest_prices_returns_latest_snapshot_only(self, db_session, sample_price_entry):
+        """Test latest prices only returns entries from the latest report date."""
+        latest_entry = PriceEntry(
+            commodity_id=sample_price_entry.commodity_id,
+            market_id=sample_price_entry.market_id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("60.00"),
+            report_type="DAILY_RETAIL",
+        )
+        db_session.add(latest_entry)
+        db_session.commit()
+
+        results = PriceService.get_latest_prices(db_session, skip=0, limit=10)
+
+        assert len(results) == 1
+        assert results[0].report_date == date(2025, 1, 20)
+
+    def test_count_prices_defaults_to_latest_snapshot(self, db_session, sample_price_entry):
+        """Test counting prices without a date only counts the latest snapshot."""
+        latest_entry = PriceEntry(
+            commodity_id=sample_price_entry.commodity_id,
+            market_id=sample_price_entry.market_id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("60.00"),
+            report_type="DAILY_RETAIL",
+        )
+        db_session.add(latest_entry)
+        db_session.commit()
+
+        assert PriceService.count_prices(db_session) == 1
 
     def test_get_prices_by_date(self, db_session, sample_commodity, sample_market):
         """Test retrieving prices for a specific date."""
@@ -197,3 +230,30 @@ class TestPriceService:
         )
 
         assert change == 0
+
+    def test_db_enforces_unique_price_entry_identity(self, db_session, sample_commodity, sample_market):
+        """Test the database rejects duplicate price entries for the same identity tuple."""
+        entry1 = PriceEntry(
+            commodity_id=sample_commodity.id,
+            market_id=sample_market.id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("50.00"),
+            report_type="DAILY_RETAIL",
+        )
+        entry2 = PriceEntry(
+            commodity_id=sample_commodity.id,
+            market_id=sample_market.id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("55.00"),
+            report_type="DAILY_RETAIL",
+        )
+        db_session.add(entry1)
+        db_session.commit()
+
+        db_session.add(entry2)
+        try:
+            db_session.commit()
+        except IntegrityError:
+            db_session.rollback()
+        else:
+            raise AssertionError("Expected unique constraint to reject duplicate price entry identity")

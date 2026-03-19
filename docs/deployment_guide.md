@@ -42,6 +42,9 @@ POSTGRES_DB=bantay_presyo
 # Redis
 REDIS_URL=redis://localhost:6379/0
 
+# Rate limiting
+RATE_LIMIT_STORAGE_URL=memory://
+
 ```
 
 ### Variable Descriptions
@@ -50,6 +53,7 @@ REDIS_URL=redis://localhost:6379/0
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `REDIS_URL` | Yes | Redis connection string for Celery |
+| `RATE_LIMIT_STORAGE_URL` | No | Storage backend for rate limiting (default: `memory://`, set to Redis for shared limits) |
 | `POSTGRES_SERVER` | No | PostgreSQL host (default: localhost) |
 | `POSTGRES_USER` | No | PostgreSQL user (default: postgres) |
 | `POSTGRES_PASSWORD` | No | PostgreSQL password (default: password) |
@@ -72,7 +76,7 @@ cd agri-bantay-presyo
 docker-compose up -d
 ```
 
-This starts 2 services:
+This starts 2 infrastructure services:
 - **db** - PostgreSQL 16 database (port 5432)
 - **redis** - Redis 7 message broker (port 6379)
 
@@ -113,11 +117,14 @@ celery -A app.core.celery_app worker --loglevel=info
 celery -A app.core.celery_app beat --loglevel=info
 ```
 
+On Windows, the default Celery configuration uses a `solo` worker pool and a local beat schedule file automatically.
+
 ### 4. Access the Application
 
-- **Web Interface**: http://localhost:8000
+- **API Root**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
+- **Test Suite**: `pytest -q` (defaults to in-memory SQLite unless `TEST_DATABASE_URL` is set)
 
 ---
 
@@ -171,6 +178,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Production
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+For local development, rate limiting uses in-memory storage by default. To use Redis-backed shared limits, set:
+
+```env
+RATE_LIMIT_STORAGE_URL=redis://localhost:6379/0
 ```
 
 ### 6. Start Celery Worker
@@ -245,6 +258,7 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
+      - RATE_LIMIT_STORAGE_URL=redis://redis:6379/0
     depends_on:
       - db
       - redis
@@ -318,6 +332,7 @@ For production, use strong passwords and secure your environment variables:
 ```env
 DATABASE_URL=postgresql://bantay_user:STRONG_PASSWORD_HERE@db:5432/bantay_presyo
 REDIS_URL=redis://redis:6379/0
+RATE_LIMIT_STORAGE_URL=redis://redis:6379/0
 ```
 
 ---
@@ -390,14 +405,14 @@ The application uses Celery Beat to run scheduled tasks:
 
 | Task | Schedule | Description |
 |------|----------|-------------|
-| `discover_new_pdfs` | Daily at 8:00 AM | Scans DA website for new Price Monitoring PDFs |
+| `app.scraper.tasks.discover_and_scrape` | Daily at 8:00 AM | Scans DA website for new Price Monitoring PDFs and queues scrape jobs |
 
 To manually trigger PDF discovery:
 
 ```bash
 python -c "
-from app.scraper.discovery import discover_new_pdfs
-discover_new_pdfs()
+from app.scraper.discovery import discover_and_scrape
+discover_and_scrape()
 "
 ```
 

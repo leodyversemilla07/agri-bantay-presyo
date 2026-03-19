@@ -2,11 +2,18 @@ from datetime import date
 from typing import Any, Dict, Union
 from uuid import UUID
 
-from sqlalchemy import desc
+from sqlalchemy import desc, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 
 class PriceService:
+    @staticmethod
+    def get_latest_report_date(db: Session) -> date | None:
+        from app.models.price_entry import PriceEntry
+
+        return db.query(func.max(PriceEntry.report_date)).scalar()
+
     @staticmethod
     def _base_query(db: Session, report_date: date | None = None):
         from app.models.price_entry import PriceEntry
@@ -22,7 +29,10 @@ class PriceService:
 
     @staticmethod
     def get_latest_prices(db: Session, skip: int = 0, limit: int = 100):
-        return PriceService._base_query(db).offset(skip).limit(limit).all()
+        latest_report_date = PriceService.get_latest_report_date(db)
+        if latest_report_date is None:
+            return []
+        return PriceService._base_query(db, report_date=latest_report_date).offset(skip).limit(limit).all()
 
     @staticmethod
     def get_prices_by_date(db: Session, report_date: date, skip: int = 0, limit: int = 100):
@@ -30,6 +40,10 @@ class PriceService:
 
     @staticmethod
     def count_prices(db: Session, report_date: date | None = None) -> int:
+        if report_date is None:
+            report_date = PriceService.get_latest_report_date(db)
+            if report_date is None:
+                return 0
         return PriceService._base_query(db, report_date=report_date).count()
 
     @staticmethod
@@ -116,17 +130,15 @@ class PriceService:
     def create_entry(db: Session, data: Dict[str, Any]):
         from app.models.price_entry import PriceEntry
 
-        # Check for existing entry to prevent duplicates
-        existing = (
-            db.query(PriceEntry)
-            .filter(
-                PriceEntry.commodity_id == data["commodity_id"],
-                PriceEntry.market_id == data["market_id"],
-                PriceEntry.report_date == data["report_date"],
-                PriceEntry.report_type == data["report_type"],
-            )
-            .first()
+        identity_filter = (
+            PriceEntry.commodity_id == data["commodity_id"],
+            PriceEntry.market_id == data["market_id"],
+            PriceEntry.report_date == data["report_date"],
+            PriceEntry.report_type == data["report_type"],
         )
+
+        # Check for existing entry to prevent duplicates
+        existing = db.query(PriceEntry).filter(*identity_filter).first()
 
         if existing:
             # Update existing record
@@ -139,6 +151,17 @@ class PriceService:
         # Create new record
         db_obj = PriceEntry(**data)
         db.add(db_obj)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            existing = db.query(PriceEntry).filter(*identity_filter).first()
+            if not existing:
+                raise
+            for key, value in data.items():
+                setattr(existing, key, value)
+            db.commit()
+            db.refresh(existing)
+            return existing
         db.refresh(db_obj)
         return db_obj

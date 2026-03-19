@@ -2,6 +2,8 @@
 Unit tests for CommodityService.
 """
 
+from sqlalchemy.exc import IntegrityError
+
 from app.models.commodity import Commodity
 from app.schemas.commodity import CommodityCreate
 from app.services.commodity_service import CommodityService
@@ -36,6 +38,13 @@ class TestCommodityService:
 
         assert result is not None
         assert result.name == sample_commodity.name
+
+    def test_get_commodity_by_name_case_insensitive(self, db_session, sample_commodity):
+        """Test retrieving a commodity by name is case insensitive."""
+        result = CommodityService.get_by_name(db_session, name=sample_commodity.name.lower())
+
+        assert result is not None
+        assert result.id == sample_commodity.id
 
     def test_get_commodity_not_found(self, db_session):
         """Test retrieving a non-existent commodity returns None."""
@@ -74,6 +83,12 @@ class TestCommodityService:
         count = db_session.query(Commodity).filter(Commodity.name == sample_commodity.name).count()
         assert count == 1
 
+    def test_get_or_create_existing_case_insensitive(self, db_session, sample_commodity):
+        """Test get_or_create reuses an existing commodity regardless of case."""
+        result = CommodityService.get_or_create(db_session, name=sample_commodity.name.upper())
+
+        assert result.id == sample_commodity.id
+
     def test_get_or_create_new(self, db_session):
         """Test get_or_create creates new commodity if not exists."""
         result = CommodityService.get_or_create(db_session, name="New Commodity", category="Vegetables", unit="kg")
@@ -100,3 +115,16 @@ class TestCommodityService:
         results = CommodityService.search(db_session, query="bangus")
         assert len(results) == 1
         assert results[0].name == "BANGUS"
+
+    def test_db_enforces_case_insensitive_unique_name(self, db_session):
+        """Test the database rejects duplicate commodity names that differ only by case."""
+        db_session.add(Commodity(name="Bangus", category="Fish"))
+        db_session.commit()
+
+        db_session.add(Commodity(name="bangus", category="Fish"))
+        try:
+            db_session.commit()
+        except IntegrityError:
+            db_session.rollback()
+        else:
+            raise AssertionError("Expected case-insensitive unique constraint to reject duplicate commodity name")
