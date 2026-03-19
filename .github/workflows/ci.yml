@@ -86,11 +86,30 @@ jobs:
         run: |
           alembic upgrade head
 
+      - name: Verify duplicate preflight passes on clean schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bantay_presyo_test
+        run: |
+          python scripts/preflight_duplicates.py
+
+      - name: Validate production compose configuration
+        env:
+          APP_IMAGE: ghcr.io/example/agri-bantay-presyo:test
+          DATABASE_URL: postgresql://postgres:postgres@db:5432/bantay_presyo
+          REDIS_URL: redis://redis:6379/0
+          RATE_LIMIT_STORAGE_URL: redis://redis:6379/1
+          API_KEY: test-api-key
+          POSTGRES_DB: bantay_presyo
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          BACKEND_CORS_ORIGINS: '["https://example.com"]'
+        run: |
+          docker compose -f docker-compose.prod.yml config > /dev/null
+
       - name: Run tests with coverage
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bantay_presyo_test
           REDIS_URL: redis://localhost:6379/0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing
 

@@ -199,6 +199,25 @@ class TestMonitoringSource:
             assert len(result) == 1
             assert "file3.pdf" in result[0]
 
+    def test_extract_report_date_from_url(self):
+        """Test extracting a report date from a DA PDF URL."""
+        result = MonitoringSource.extract_report_date(
+            "https://www.da.gov.ph/wp-content/uploads/2026/03/Price-Monitoring-March-18-2026.pdf"
+        )
+        assert result == date(2026, 3, 18)
+
+    def test_filter_links_by_date_range(self):
+        """Test filtering DA PDF links by report date range."""
+        links = [
+            "https://www.da.gov.ph/wp-content/uploads/2026/03/Price-Monitoring-March-18-2026.pdf",
+            "https://www.da.gov.ph/wp-content/uploads/2026/03/Price-Monitoring-March-17-2026.pdf",
+            "https://www.da.gov.ph/wp-content/uploads/2026/03/Price-Monitoring-March-16-2026.pdf",
+        ]
+        result = MonitoringSource.filter_links_by_date_range(links, date(2026, 3, 17), date(2026, 3, 18))
+        assert len(result) == 2
+        assert links[0] in result
+        assert links[1] in result
+
 
 class TestReportDateNormalization:
     """Tests for report date normalization."""

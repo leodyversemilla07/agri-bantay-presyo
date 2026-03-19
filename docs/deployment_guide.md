@@ -29,9 +29,14 @@ This guide covers deploying the Agri Bantay Presyo application for both developm
 
 ## Environment Variables
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` for local work or `.env.production` for VPS deployment:
 
 ```env
+# Runtime
+APP_ENV=development
+LOG_LEVEL=INFO
+LOG_AS_JSON=false
+
 # Database
 DATABASE_URL=postgresql://postgres:password@localhost:5432/bantay_presyo
 POSTGRES_SERVER=localhost
@@ -45,6 +50,13 @@ REDIS_URL=redis://localhost:6379/0
 # Rate limiting
 RATE_LIMIT_STORAGE_URL=memory://
 
+# Celery runtime
+CELERY_WORKER_POOL=solo
+CELERY_WORKER_CONCURRENCY=1
+CELERY_BEAT_SCHEDULE_FILE=celerybeat-schedule.local
+# Operational checks
+WAIT_FOR_SERVICES_TIMEOUT_SECONDS=60
+INGESTION_STALENESS_HOURS=36
 ```
 
 ### Variable Descriptions
@@ -53,7 +65,15 @@ RATE_LIMIT_STORAGE_URL=memory://
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `REDIS_URL` | Yes | Redis connection string for Celery |
+| `APP_ENV` | No | Runtime environment (`development` or `production`) |
+| `LOG_LEVEL` | No | Standard log level (`INFO`, `WARNING`, etc.) |
+| `LOG_AS_JSON` | No | Emit structured JSON logs (enabled by default in production) |
 | `RATE_LIMIT_STORAGE_URL` | No | Storage backend for rate limiting (default: `memory://`, set to Redis for shared limits) |
+| `CELERY_WORKER_POOL` | No | Celery worker pool mode (`solo` locally on Windows, `prefork` in production) |
+| `CELERY_WORKER_CONCURRENCY` | No | Celery worker concurrency (`2` by default in production) |
+| `CELERY_BEAT_SCHEDULE_FILE` | No | Beat schedule filename (defaults to `/app/data/celerybeat-schedule` in production) |
+| `WAIT_FOR_SERVICES_TIMEOUT_SECONDS` | No | Timeout for dependency wait checks before process startup |
+| `INGESTION_STALENESS_HOURS` | No | Maximum age for the latest successful ingestion before health checks fail |
 | `POSTGRES_SERVER` | No | PostgreSQL host (default: localhost) |
 | `POSTGRES_USER` | No | PostgreSQL user (default: postgres) |
 | `POSTGRES_PASSWORD` | No | PostgreSQL password (default: password) |
@@ -114,10 +134,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 celery -A app.core.celery_app worker --loglevel=info
 
 # Start Celery beat (separate terminal)
-celery -A app.core.celery_app beat --loglevel=info
+python scripts/start_celery_beat.py
 ```
 
-On Windows, the default Celery configuration uses a `solo` worker pool and a local beat schedule file automatically.
+On Windows, the default Celery configuration uses a `solo` worker pool. The beat launcher resets the local schedule file before startup to avoid stale shelve/dbm state.
 
 ### 4. Access the Application
 
@@ -125,6 +145,8 @@ On Windows, the default Celery configuration uses a `solo` worker pool and a loc
 - **API Documentation**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 - **Test Suite**: `pytest -q` (defaults to in-memory SQLite unless `TEST_DATABASE_URL` is set)
+- **Admin Health Script**: `python scripts/health_check.py`
+- **Readiness Probe**: `GET /health/ready`
 
 ---
 
@@ -186,6 +208,16 @@ For local development, rate limiting uses in-memory storage by default. To use R
 RATE_LIMIT_STORAGE_URL=redis://localhost:6379/0
 ```
 
+Local admin tooling:
+
+```bash
+python scripts/preflight_duplicates.py
+python scripts/cleanup_duplicates.py --apply
+python scripts/backfill_prices.py --start-date 2026-03-01 --end-date 2026-03-05
+python scripts/health_check.py
+python scripts/health_check.py --mode ready
+```
+
 ### 6. Start Celery Worker
 
 ```bash
@@ -197,7 +229,7 @@ celery -A app.core.celery_app worker --loglevel=info
 
 ```bash
 # In another separate terminal
-celery -A app.core.celery_app beat --loglevel=info
+python scripts/start_celery_beat.py
 ```
 
 ---
@@ -233,106 +265,49 @@ The application uses the following main tables:
 
 ### Docker Compose (Production)
 
-Create a `docker-compose.prod.yml`:
+The repo now includes a production stack in `docker-compose.prod.yml` with:
+- `api` - FastAPI application behind readiness checks
+- `worker` - Celery worker using production defaults
+- `beat` - Celery beat with a persistent schedule path in `/app/data`
+- `db` - PostgreSQL 16 with a persistent volume
+- `redis` - Redis 7 with append-only persistence
+- `caddy` - reverse proxy and TLS termination
 
-```yaml
-services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: always
+### VPS Deployment Flow
 
-  redis:
-    image: redis:7-alpine
-    restart: always
-
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379/0
-      - RATE_LIMIT_STORAGE_URL=redis://redis:6379/0
-    depends_on:
-      - db
-      - redis
-    restart: always
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
-
-  celery-worker:
-    build: .
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - db
-      - redis
-    restart: always
-    command: celery -A app.core.celery_app worker --loglevel=warning --concurrency=2
-
-  celery-beat:
-    build: .
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - db
-      - redis
-      - celery-worker
-    restart: always
-    command: celery -A app.core.celery_app beat --loglevel=warning
-
-volumes:
-  postgres_data:
-```
-
-### Nginx Reverse Proxy
-
-Example Nginx configuration:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-### SSL with Let's Encrypt
+1. Copy `.env.example` to `.env.production` and set real credentials.
+2. Set `APP_DOMAIN` and `APP_IMAGE` for the target environment.
+3. Keep the repo checked out on the VPS.
+4. Run:
 
 ```bash
-# Install Certbot
-sudo apt install certbot python3-certbot-nginx
-
-# Get SSL certificate
-sudo certbot --nginx -d your-domain.com
+./scripts/deploy_prod.sh
 ```
+
+The deploy script performs:
+- dependency startup for Postgres and Redis
+- dependency waiting via `python scripts/wait_for_services.py`
+- logical backup via `./scripts/backup_db.sh`
+- duplicate preflight via `python scripts/preflight_duplicates.py`
+- `alembic upgrade head`
+- restart of `api`, `worker`, `beat`, and `caddy`
+- post-deploy readiness and operational health checks
 
 ### Environment Variables (Production)
 
 For production, use strong passwords and secure your environment variables:
 
 ```env
+APP_ENV=production
+LOG_AS_JSON=true
+APP_DOMAIN=prices.example.com
+APP_IMAGE=ghcr.io/owner/agri-bantay-presyo:sha-<git-sha>
 DATABASE_URL=postgresql://bantay_user:STRONG_PASSWORD_HERE@db:5432/bantay_presyo
 REDIS_URL=redis://redis:6379/0
-RATE_LIMIT_STORAGE_URL=redis://redis:6379/0
+RATE_LIMIT_STORAGE_URL=redis://redis:6379/1
+CELERY_WORKER_POOL=prefork
+CELERY_WORKER_CONCURRENCY=2
+CELERY_BEAT_SCHEDULE_FILE=/app/data/celerybeat-schedule
 ```
 
 ---
@@ -343,42 +318,52 @@ RATE_LIMIT_STORAGE_URL=redis://redis:6379/0
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f
 
 # Specific service
-docker-compose logs -f db
-docker-compose logs -f redis
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f api
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f worker
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f beat
 ```
 
 ### Check Service Health
 
 ```bash
-# API health check
-curl http://localhost:8000/api/v1/stats/dashboard
+# API liveness
+curl http://localhost:8000/health
+
+# API readiness
+curl http://localhost:8000/health/ready
+
+# Full operational check from inside the API container
+docker compose -f docker-compose.prod.yml --env-file .env.production exec -T api \
+  python scripts/health_check.py --production
 
 # Check running containers
-docker-compose ps
+docker compose -f docker-compose.prod.yml --env-file .env.production ps
 ```
 
 ### Database Backup
 
 ```bash
 # Backup
-docker-compose exec db pg_dump -U postgres bantay_presyo > backup_$(date +%Y%m%d).sql
+./scripts/backup_db.sh
 
 # Restore
-cat backup_20260110.sql | docker-compose exec -T db psql -U postgres bantay_presyo
+cat backups/predeploy-20260110-120000.sql | docker compose -f docker-compose.prod.yml --env-file .env.production exec -T db \
+  psql -U "$POSTGRES_USER" "$POSTGRES_DB"
 ```
 
 ### Restart Services
 
 ```bash
 # Restart all
-docker-compose restart
+docker compose -f docker-compose.prod.yml --env-file .env.production restart
 
 # Restart specific service
-docker-compose restart db
-docker-compose restart redis
+docker compose -f docker-compose.prod.yml --env-file .env.production restart api
+docker compose -f docker-compose.prod.yml --env-file .env.production restart worker
+docker compose -f docker-compose.prod.yml --env-file .env.production restart beat
 ```
 
 ### Update Application
@@ -387,14 +372,8 @@ docker-compose restart redis
 # Pull latest changes
 git pull origin main
 
-# Rebuild and restart infrastructure
-docker-compose up -d
-
-# Update local dependencies
-pip install -r requirements.txt
-
-# Run any new migrations
-alembic upgrade head
+# Re-deploy through the hardened production path
+./scripts/deploy_prod.sh
 ```
 
 ---
@@ -416,6 +395,12 @@ discover_and_scrape()
 "
 ```
 
+To fail a cron or monitoring check when ingestion is stale:
+
+```bash
+python scripts/check_alerts.py
+```
+
 ---
 
 ## Troubleshooting
@@ -432,10 +417,10 @@ sqlalchemy.exc.OperationalError: connection refused
 
 ```bash
 # Check if db container is running
-docker-compose ps db
+docker compose -f docker-compose.prod.yml --env-file .env.production ps db
 
 # Restart database
-docker-compose restart db
+docker compose -f docker-compose.prod.yml --env-file .env.production restart db
 ```
 
 #### 2. Redis Connection Error
@@ -447,7 +432,7 @@ redis.exceptions.ConnectionError: Connection refused
 **Solution**: Ensure Redis is running.
 
 ```bash
-docker-compose restart redis
+docker compose -f docker-compose.prod.yml --env-file .env.production restart redis
 ```
 
 #### 3. Migration Errors
@@ -462,9 +447,8 @@ alembic.util.exc.CommandError: Can't locate revision
 # Stamp current state
 alembic stamp head
 
-# Or fresh start (CAUTION: drops all data)
-alembic downgrade base
-alembic upgrade head
+# Or verify the schema state through the readiness endpoint
+curl http://localhost:8000/health/ready
 ```
 
 #### 5. Port Already in Use
@@ -509,7 +493,7 @@ python scripts/wipe_db.py
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Nginx (Reverse Proxy)                     │
+│                    Caddy (Reverse Proxy)                     │
 │                      Port 80/443                             │
 └─────────────────────────────┬───────────────────────────────┘
                               │

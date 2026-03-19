@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from datetime import date, datetime
 
 from app.core.celery_app import celery_app
@@ -9,6 +10,7 @@ from app.db.session import SessionLocal
 from app.scraper.downloader import PDFDownloader
 from app.scraper.parser import PriceParser
 from app.services.commodity_service import CommodityService
+from app.services.ingestion_run_service import IngestionRunService
 from app.services.market_service import MarketService
 from app.services.price_service import PriceService
 
@@ -53,9 +55,27 @@ def scrape_daily_prices(self, url: str):
     db = SessionLocal()
     pdf_path = None
     entries_processed = 0
+    run = IngestionRunService.start_run(
+        db,
+        task_name="scrape_daily_prices",
+        task_id=self.request.id,
+        source_url=url,
+        source_file=url.split("/")[-1],
+    )
+    report_date = None
 
     try:
-        logger.info(f"Starting daily scrape for URL: {url} (attempt {self.request.retries + 1})")
+        started_at = time.monotonic()
+        logger.info(
+            "Starting daily scrape",
+            extra={
+                "event": "scrape_started",
+                "task_id": self.request.id,
+                "task_name": "scrape_daily_prices",
+                "source_url": url,
+                "source_file": url.split("/")[-1],
+            },
+        )
 
         # Download PDF with error handling
         try:
@@ -70,8 +90,26 @@ def scrape_daily_prices(self, url: str):
             raise PDFParseError(filename=pdf_path.name if pdf_path else url, reason=str(e))
 
         if not parsed_results:
-            logger.warning(f"No data extracted from {pdf_path.name if pdf_path else url}")
+            logger.warning(
+                "No data extracted from source PDF",
+                extra={
+                    "event": "scrape_empty",
+                    "task_id": self.request.id,
+                    "source_url": url,
+                    "source_file": pdf_path.name if pdf_path else url.split("/")[-1],
+                },
+            )
+            IngestionRunService.finish_run(
+                db,
+                run,
+                status="empty",
+                entries_total=0,
+                entries_processed=0,
+                error_count=0,
+            )
             return {"status": "empty", "url": url, "entries": 0}
+
+        report_date = _normalize_report_date(parsed_results[0].get("report_date"))
 
         # Pre-process entries to normalize names and identify unique commodities
         unique_commodity_names = set()
@@ -101,8 +139,15 @@ def scrape_daily_prices(self, url: str):
                         unit=sample.get("unit"),
                     )
                     commodity_map[name] = new_commodity
-                except Exception as e:
-                    logger.error(f"Failed to create commodity {name}: {e}")
+                except Exception:
+                    logger.error(
+                        "Failed to create commodity during scrape",
+                        extra={
+                            "event": "commodity_create_failed",
+                            "task_id": self.request.id,
+                            "source_url": url,
+                        },
+                    )
 
         # Process each entry with individual error handling
         errors = []
@@ -142,20 +187,67 @@ def scrape_daily_prices(self, url: str):
             except Exception as entry_error:
                 entry_name = entry.get("commodity", "Unknown")
                 errors.append({"commodity": entry_name, "error": str(entry_error)})
-                logger.warning(f"Failed to process entry {entry_name}: {entry_error}")
+                logger.warning(
+                    "Failed to process scraped entry",
+                    extra={
+                        "event": "scrape_entry_failed",
+                        "task_id": self.request.id,
+                        "source_url": url,
+                        "source_file": pdf_path.name if pdf_path else url.split("/")[-1],
+                    },
+                )
                 continue  # Continue processing other entries
 
         logger.info(
-            f"Successfully processed {entries_processed}/{len(parsed_results)} entries from {pdf_path.name if pdf_path else url}"
+            "Daily scrape completed",
+            extra={
+                "event": "scrape_completed",
+                "task_id": self.request.id,
+                "task_name": "scrape_daily_prices",
+                "source_url": url,
+                "source_file": pdf_path.name if pdf_path else url.split("/")[-1],
+                "report_date": report_date,
+                "status": "success" if not errors else "partial_success",
+                "entries_total": len(parsed_results),
+                "entries_processed": entries_processed,
+                "error_count": len(errors),
+                "elapsed_seconds": round(time.monotonic() - started_at, 3),
+            },
         )
 
         if errors:
-            logger.warning(f"Encountered {len(errors)} errors during processing")
+            logger.warning(
+                "Scrape completed with entry-level errors",
+                extra={
+                    "event": "scrape_completed_with_errors",
+                    "task_id": self.request.id,
+                    "source_url": url,
+                    "error_count": len(errors),
+                },
+            )
+
+        IngestionRunService.finish_run(
+            db,
+            run,
+            status="success" if not errors else "partial_success",
+            report_date=report_date,
+            entries_total=len(parsed_results),
+            entries_processed=entries_processed,
+            error_count=len(errors),
+            error_message=None if not errors else f"{len(errors)} entries failed during processing",
+        )
 
         # Clean up downloaded file
         if pdf_path and pdf_path.exists():
             os.remove(pdf_path)
-            logger.info(f"Cleaned up downloaded file: {pdf_path.name}")
+            logger.info(
+                "Cleaned up downloaded PDF",
+                extra={
+                    "event": "scrape_cleanup_completed",
+                    "task_id": self.request.id,
+                    "source_file": pdf_path.name,
+                },
+            )
 
         return {
             "status": "success",
@@ -166,14 +258,60 @@ def scrape_daily_prices(self, url: str):
         }
 
     except (PDFDownloadError, PDFParseError) as e:
-        logger.error(f"Scraping failed (will retry): {e.message}")
+        logger.error(
+            "Scraping failed and will be retried",
+            extra={
+                "event": "scrape_failed_retryable",
+                "task_id": self.request.id,
+                "task_name": "scrape_daily_prices",
+                "source_url": url,
+                "source_file": pdf_path.name if pdf_path else url.split("/")[-1],
+                "report_date": report_date,
+                "status": "failed",
+                "entries_processed": entries_processed,
+                "error_count": 1,
+            },
+        )
+        IngestionRunService.finish_run(
+            db,
+            run,
+            status="failed",
+            report_date=report_date,
+            entries_total=entries_processed,
+            entries_processed=entries_processed,
+            error_count=1,
+            error_message=e.message,
+        )
         # Clean up on failure
         if pdf_path and pdf_path.exists():
             os.remove(pdf_path)
         raise  # Let Celery handle retry
 
-    except Exception as e:
-        logger.exception(f"Unexpected error during scraping: {e}")
+    except Exception:
+        logger.exception(
+            "Unexpected error during scraping",
+            extra={
+                "event": "scrape_failed_unexpected",
+                "task_id": self.request.id,
+                "task_name": "scrape_daily_prices",
+                "source_url": url,
+                "source_file": pdf_path.name if pdf_path else url.split("/")[-1],
+                "report_date": report_date,
+                "status": "failed",
+                "entries_processed": entries_processed,
+                "error_count": 1,
+            },
+        )
+        IngestionRunService.finish_run(
+            db,
+            run,
+            status="failed",
+            report_date=report_date,
+            entries_total=entries_processed,
+            entries_processed=entries_processed,
+            error_count=1,
+            error_message=str(e),
+        )
         # Clean up on failure
         if pdf_path and pdf_path.exists():
             os.remove(pdf_path)

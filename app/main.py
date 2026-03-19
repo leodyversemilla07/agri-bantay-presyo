@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -10,13 +8,15 @@ from app.api.meta import router as meta_router
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.error_handlers import register_exception_handlers
+from app.core.logging import configure_logging
 from app.core.rate_limiter import limiter
 
 # Configure mappers after imports
 configure_mappers()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+configure_logging()
+import logging
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -47,9 +47,18 @@ if settings.BACKEND_CORS_ORIGINS:
 app.include_router(meta_router)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-logger.info(f"Application started: {settings.PROJECT_NAME}")
-logger.info(f"Rate limiting: {settings.RATE_LIMIT_REQUESTS} requests per {settings.RATE_LIMIT_WINDOW} seconds")
+logger.info(
+    "Application started",
+    extra={"event": "application_started", "status": "ok"},
+)
+logger.info(
+    "Rate limiting configured",
+    extra={"event": "rate_limit_configured"},
+)
 if settings.API_KEY:
-    logger.info("API key authentication is enabled")
+    logger.info("API key authentication is enabled", extra={"event": "api_key_enabled"})
 else:
-    logger.warning("API key authentication is not configured; protected write endpoints will reject requests")
+    logger.warning(
+        "API key authentication is not configured; protected write endpoints will reject requests",
+        extra={"event": "api_key_missing"},
+    )

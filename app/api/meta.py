@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.health import get_readiness_status
+from app.db.session import get_db
 
 router = APIRouter()
 
@@ -22,3 +25,12 @@ def read_root():
 def health_check():
     """Lightweight health endpoint for uptime checks."""
     return {"status": "ok"}
+
+
+@router.get("/health/ready", tags=["meta"])
+def readiness_check(response: Response, db: Session = Depends(get_db)):
+    """Readiness endpoint for DB, Redis, and migration-state checks."""
+    readiness = get_readiness_status(db)
+    if readiness["status"] != "ready":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return readiness

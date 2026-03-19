@@ -4,11 +4,26 @@ Unit tests for PriceService.
 
 from datetime import date, timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
 
+from app.models.commodity import Commodity
+from app.models.market import Market
 from app.models.price_entry import PriceEntry
 from app.services.price_service import PriceService
+
+
+def _add_price(db_session, commodity_id, market_id, report_date, price_prevailing):
+    entry = PriceEntry(
+        commodity_id=commodity_id,
+        market_id=market_id,
+        report_date=report_date,
+        price_prevailing=Decimal(price_prevailing),
+        report_type="DAILY_RETAIL",
+    )
+    db_session.add(entry)
+    return entry
 
 
 class TestPriceService:
@@ -230,6 +245,108 @@ class TestPriceService:
         )
 
         assert change == 0
+
+    def test_get_dashboard_snapshot_stats_uses_previous_available_snapshot(self, db_session, sample_commodity, sample_market):
+        """Test dashboard deltas compare against the previous available snapshot."""
+        extra_commodity = Commodity(id=uuid4(), name="Test Onion", category="Vegetable", unit="kg")
+        extra_market = Market(id=uuid4(), name="North Market", region="NCR", city="Quezon City")
+        db_session.add_all([extra_commodity, extra_market])
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "110.00")
+        _add_price(db_session, extra_commodity.id, extra_market.id, date(2025, 1, 20), "80.00")
+        db_session.commit()
+
+        stats = PriceService.get_dashboard_snapshot_stats(db_session)
+
+        assert stats["latest_report_date"] == date(2025, 1, 20)
+        assert stats["previous_report_date"] == date(2025, 1, 15)
+        assert stats["commodities"]["count"] == 2
+        assert stats["commodities"]["change"] == 1
+        assert stats["markets"]["count"] == 2
+        assert stats["markets"]["change"] == 1
+        assert stats["prices"]["count"] == 2
+        assert stats["prices"]["change"] == 1
+
+    def test_get_commodity_trend_summary_aggregates_across_markets(self, db_session, sample_commodity, sample_market):
+        """Test commodity summary averages prevailing prices across markets when market_id is omitted."""
+        second_market = Market(id=uuid4(), name="South Market", region="NCR", city="Makati")
+        db_session.add(second_market)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, sample_commodity.id, second_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, sample_commodity.id, second_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        summary = PriceService.get_commodity_trend_summary(db_session, commodity_id=sample_commodity.id)
+
+        assert summary["latest_report_date"] == date(2025, 1, 20)
+        assert summary["previous_report_date"] == date(2025, 1, 15)
+        assert summary["current_prevailing_price"] == Decimal("140.00")
+        assert summary["previous_prevailing_price"] == Decimal("110.00")
+        assert summary["absolute_change"] == Decimal("30.00")
+        assert summary["percent_change"] == 27.3
+        assert summary["market_count"] == 2
+
+    def test_get_commodity_trend_summary_for_specific_market(self, db_session, sample_commodity, sample_market):
+        """Test market-specific commodity summary does not aggregate across markets."""
+        second_market = Market(id=uuid4(), name="South Market", region="NCR", city="Makati")
+        db_session.add(second_market)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, sample_commodity.id, second_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, sample_commodity.id, second_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        summary = PriceService.get_commodity_trend_summary(
+            db_session,
+            commodity_id=sample_commodity.id,
+            market_id=sample_market.id,
+        )
+
+        assert summary["current_prevailing_price"] == Decimal("130.00")
+        assert summary["previous_prevailing_price"] == Decimal("100.00")
+        assert summary["absolute_change"] == Decimal("30.00")
+        assert summary["percent_change"] == 30.0
+        assert summary["market_count"] == 1
+
+    def test_get_commodity_trend_summary_without_previous_snapshot_returns_null_changes(
+        self, db_session, sample_commodity, sample_market
+    ):
+        """Test summary returns null change fields when there is no earlier snapshot."""
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        db_session.commit()
+
+        summary = PriceService.get_commodity_trend_summary(db_session, commodity_id=sample_commodity.id)
+
+        assert summary["previous_report_date"] is None
+        assert summary["previous_prevailing_price"] is None
+        assert summary["absolute_change"] is None
+        assert summary["percent_change"] is None
+
+    def test_get_commodity_trend_series_returns_chronological_points(self, db_session, sample_commodity, sample_market):
+        """Test trend series is returned in chronological order."""
+        second_market = Market(id=uuid4(), name="South Market", region="NCR", city="Makati")
+        db_session.add(second_market)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, sample_commodity.id, second_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 18), "110.00")
+        _add_price(db_session, sample_commodity.id, second_market.id, date(2025, 1, 18), "130.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, sample_commodity.id, second_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        points = PriceService.get_commodity_trend_series(db_session, commodity_id=sample_commodity.id, limit=2)
+
+        assert len(points) == 2
+        assert points[0]["report_date"] == date(2025, 1, 18)
+        assert points[1]["report_date"] == date(2025, 1, 20)
+        assert points[0]["prevailing_price"] == Decimal("120.00")
+        assert points[1]["prevailing_price"] == Decimal("140.00")
+        assert points[1]["market_count"] == 2
 
     def test_db_enforces_unique_price_entry_identity(self, db_session, sample_commodity, sample_market):
         """Test the database rejects duplicate price entries for the same identity tuple."""

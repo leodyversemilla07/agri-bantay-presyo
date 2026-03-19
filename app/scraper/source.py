@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 from typing import List
 
 import httpx
@@ -62,3 +63,25 @@ class MonitoringSource:
 
         logger.info(f"New PDFs to process: {len(new_links)}")
         return new_links
+
+    @staticmethod
+    def extract_report_date(url: str):
+        filename = url.split("/")[-1]
+        match = re.search(r"Price-Monitoring-([A-Za-z]+)-(\d{1,2})-(\d{4})\.pdf$", filename)
+        if not match:
+            return None
+        try:
+            return datetime.strptime("-".join(match.groups()), "%B-%d-%Y").date()
+        except ValueError:
+            return None
+
+    @staticmethod
+    def filter_links_by_date_range(links: List[str], start_date, end_date) -> List[str]:
+        filtered_links = []
+        for url in links:
+            report_date = MonitoringSource.extract_report_date(url)
+            if report_date is None:
+                continue
+            if start_date <= report_date <= end_date:
+                filtered_links.append(url)
+        return filtered_links

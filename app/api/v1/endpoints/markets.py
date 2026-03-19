@@ -1,4 +1,5 @@
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
@@ -46,7 +47,7 @@ def create_market(
 
 @router.get("/{market_id}", response_model=Market)
 @limiter.limit("200/minute")
-def read_market(request: Request, market_id: str, db: Session = Depends(get_db)):
+def read_market(request: Request, market_id: UUID, db: Session = Depends(get_db)):
     market = MarketService.get(db, market_id=market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")

@@ -54,9 +54,9 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 4. Optional: run Celery processes in separate terminals:
    ```bash
    celery -A app.core.celery_app worker --loglevel=info
-   celery -A app.core.celery_app beat --loglevel=info
+   python scripts/start_celery_beat.py
    ```
-   On Windows, the app defaults the worker to a `solo` pool and uses a local beat schedule file automatically.
+   On Windows, the app defaults the worker to a `solo` pool. The beat launcher resets the local schedule file before startup to avoid stale-shelve failures.
 5. Run the test suite:
    ```bash
    pytest -q
@@ -71,11 +71,15 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 ### Core REST Endpoints
 
 - `GET /health` - Service health check
+- `GET /health/ready` - Readiness check for Postgres, Redis, and migration head state
 - `GET /api/v1/commodities` - Paginated commodities with `items`, `total`, `skip`, `limit`; filter with `category` or search with `q`
 - `GET /api/v1/commodities/{commodity_id}/history` - Commodity price history
 - `GET /api/v1/markets` - Paginated markets with `items`, `total`, `skip`, `limit`; search with `q`
-- `GET /api/v1/prices` - Paginated latest or date-filtered prices
+- `GET /api/v1/prices` - Paginated latest-report snapshot or date-filtered prices
 - `GET /api/v1/prices/export` - Export prices as CSV
+- `GET /api/v1/stats/dashboard` - Aggregate counts plus `latest_report_date`, `previous_report_date`, and snapshot deltas
+- `GET /api/v1/trends/commodities/{commodity_id}/summary` - Commodity trend summary, optionally scoped to a market
+- `GET /api/v1/trends/commodities/{commodity_id}/series` - Chronological commodity trend points, aggregated across markets by default
 - `POST /api/v1/commodities` and `POST /api/v1/markets` - Create resources, returning `201 Created`; requires `X-API-Key`
 
 ### Authentication
@@ -87,7 +91,32 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 
 ## Deployment
 
-Deploy to Heroku, Railway, or VPS with PostgreSQL.
+The supported production target is a single Linux VPS running Docker Compose.
+
+1. Copy `.env.example` to `.env.production` and fill in production secrets.
+2. Ensure the VPS has the repo checked out and Docker Compose v2 available.
+3. Set `APP_IMAGE` to the image tag you want to deploy, or let CI export it during the CD workflow.
+4. Run:
+   ```bash
+   ./scripts/deploy_prod.sh
+   ```
+
+Production uses:
+- `docker-compose.prod.yml` for `api`, `worker`, `beat`, `db`, `redis`, and `caddy`
+- `scripts/wait_for_services.py` before service startup
+- `scripts/preflight_duplicates.py` before migrations
+- `scripts/backup_db.sh` before deploy-time migrations
+- `scripts/health_check.py --mode ready --production` for post-deploy verification
+
+## Admin Scripts
+
+- `python scripts/preflight_duplicates.py` - Non-destructive duplicate scan before applying uniqueness migrations
+- `python scripts/cleanup_duplicates.py --apply` - Deterministic duplicate cleanup for local/admin use
+- `python scripts/backfill_prices.py --start-date 2026-03-01 --end-date 2026-03-05` - Backfill DA PDFs over a date range
+- `python scripts/backfill_prices.py --url <pdf-url>` - Backfill explicit PDF URLs
+- `python scripts/health_check.py` - Check Postgres, Redis, schema head state, worker reachability, beat freshness, and ingestion freshness
+- `python scripts/health_check.py --mode ready` - Readiness-only check for API health probes
+- `python scripts/check_alerts.py` - Exit non-zero when ingestion is stale or the latest ingestion run failed
 
 ## Contributing
 

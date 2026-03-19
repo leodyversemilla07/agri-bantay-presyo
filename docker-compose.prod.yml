@@ -1,0 +1,132 @@
+services:
+  caddy:
+    image: caddy:2
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+  api:
+    image: ${APP_IMAGE:-agri-bantay-presyo:latest}
+    build:
+      context: .
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RATE_LIMIT_STORAGE_URL: ${RATE_LIMIT_STORAGE_URL}
+      API_KEY: ${API_KEY}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_AS_JSON: ${LOG_AS_JSON:-true}
+      CELERY_BEAT_SCHEDULE_FILE: /app/data/celerybeat-schedule
+      INGESTION_STALENESS_HOURS: ${INGESTION_STALENESS_HOURS:-36}
+    command: ["sh", "-c", "python scripts/wait_for_services.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "scripts/health_check.py", "--mode", "ready", "--quiet"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    image: ${APP_IMAGE:-agri-bantay-presyo:latest}
+    build:
+      context: .
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RATE_LIMIT_STORAGE_URL: ${RATE_LIMIT_STORAGE_URL}
+      API_KEY: ${API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_AS_JSON: ${LOG_AS_JSON:-true}
+      CELERY_WORKER_POOL: ${CELERY_WORKER_POOL:-prefork}
+      CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-2}
+      CELERY_BEAT_SCHEDULE_FILE: /app/data/celerybeat-schedule
+      INGESTION_STALENESS_HOURS: ${INGESTION_STALENESS_HOURS:-36}
+    command: ["sh", "-c", "python scripts/wait_for_services.py && celery -A app.core.celery_app worker --loglevel=info"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+
+  beat:
+    image: ${APP_IMAGE:-agri-bantay-presyo:latest}
+    build:
+      context: .
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RATE_LIMIT_STORAGE_URL: ${RATE_LIMIT_STORAGE_URL}
+      API_KEY: ${API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_AS_JSON: ${LOG_AS_JSON:-true}
+      CELERY_BEAT_SCHEDULE_FILE: /app/data/celerybeat-schedule
+    command: ["sh", "-c", "python scripts/wait_for_services.py && python scripts/start_celery_beat.py"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  app_data:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
@@ -50,7 +51,7 @@ def create_commodity(
 
 @router.get("/{commodity_id}", response_model=Commodity)
 @limiter.limit("200/minute")
-def read_commodity(request: Request, commodity_id: str, db: Session = Depends(get_db)):
+def read_commodity(request: Request, commodity_id: UUID, db: Session = Depends(get_db)):
     commodity = CommodityService.get(db, commodity_id=commodity_id)
     if not commodity:
         raise HTTPException(status_code=404, detail="Commodity not found")
@@ -61,7 +62,7 @@ def read_commodity(request: Request, commodity_id: str, db: Session = Depends(ge
 @limiter.limit("100/minute")
 def read_commodity_history(
     request: Request,
-    commodity_id: str,
+    commodity_id: UUID,
     limit: int = 30,
     db: Session = Depends(get_db),
 ):
