@@ -30,7 +30,11 @@ def main() -> int:
     else:
         status = get_operational_health_status()
         exit_code = 0 if all([status["postgres"], status["redis"], status["schema_at_head"], status["celery_worker"]]) else 1
-        if args.production and (not status["ingestion_is_fresh"] or status["latest_ingestion_failure"] is not None):
+        if args.production and (
+            not status["ingestion_is_fresh"]
+            or status["latest_ingestion_failure"] is not None
+            or status["latest_ingestion_has_anomalies"]
+        ):
             exit_code = 1
 
     print(json.dumps(status, indent=None if args.quiet else 2))

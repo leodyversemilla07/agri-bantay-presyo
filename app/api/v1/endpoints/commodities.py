@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import verify_api_key
+from app.api.deps import verify_service_api_key
 from app.core.config import settings
 from app.core.rate_limiter import limiter
 from app.db.session import get_db
@@ -39,7 +39,7 @@ def create_commodity(
     response: Response,
     commodity_in: CommodityCreate,
     db: Session = Depends(get_db),
-    _: bool = Depends(verify_api_key),
+    _=Depends(verify_service_api_key),
 ):
     existing = CommodityService.get_by_name(db, name=commodity_in.name)
     if existing:

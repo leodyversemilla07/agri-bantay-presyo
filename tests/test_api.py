@@ -2,6 +2,7 @@
 Tests for API endpoints.
 """
 
+from datetime import UTC, datetime
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
@@ -88,15 +89,28 @@ class TestCommoditiesAPI:
             json={"name": "Tilapia", "category": "Fish", "unit": "kg"},
             headers={"X-API-Key": "wrong-key"},
         )
-        assert response.status_code == 403
+        assert response.status_code == 401
         assert response.json()["detail"] == "Invalid API key"
+
+    def test_create_commodity_accepts_admin_api_key(self, client, admin_auth_headers):
+        """Test admin credentials can access service-scoped write routes."""
+        response = client.post(
+            "/api/v1/commodities/",
+            json={"name": "Tilapia", "category": "Fish", "unit": "kg"},
+            headers=admin_auth_headers,
+        )
+        assert response.status_code == 201
 
     def test_create_commodity_fails_when_server_has_no_api_key(self, client):
         """Test creating a commodity fails explicitly if the server key is not configured."""
         from app.core.config import settings
 
         original_api_key = settings.API_KEY
+        original_service_api_keys = dict(settings.SERVICE_API_KEYS)
+        original_admin_api_keys = dict(settings.ADMIN_API_KEYS)
         settings.API_KEY = None
+        settings.SERVICE_API_KEYS = {}
+        settings.ADMIN_API_KEYS = {}
         try:
             response = client.post(
                 "/api/v1/commodities/",
@@ -105,9 +119,11 @@ class TestCommoditiesAPI:
             )
         finally:
             settings.API_KEY = original_api_key
+            settings.SERVICE_API_KEYS = original_service_api_keys
+            settings.ADMIN_API_KEYS = original_admin_api_keys
 
         assert response.status_code == 503
-        assert response.json()["detail"] == "API key authentication is not configured on the server"
+        assert response.json()["detail"] == "Protected endpoint authentication is not configured on the server"
 
     def test_get_commodity_by_id(self, client, sample_commodity):
         """Test retrieving a commodity by ID."""
@@ -293,6 +309,158 @@ class TestPricesAPI:
         assert "2025-01-20" in response.text
         assert "2025-01-15" not in response.text
 
+    def test_get_daily_prices_filters_by_commodity_latest_within_slice(
+        self, client, db_session, sample_commodity, sample_market
+    ):
+        """Test commodity filters still default to the latest snapshot within the filtered slice."""
+        other_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(other_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, other_commodity.id, sample_market.id, date(2025, 1, 15), "80.00")
+        db_session.commit()
+
+        response = client.get(f"/api/v1/prices/?commodity_id={other_commodity.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["commodity_id"] == str(other_commodity.id)
+        assert data["items"][0]["report_date"] == "2025-01-15"
+
+    def test_get_daily_prices_filters_by_category_and_region(self, client, db_session, sample_commodity, sample_market):
+        """Test category and region filters are supported on the price API."""
+        other_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        other_market = Market(id=uuid4(), name="South Market", region="Region IV-A", city="Calamba")
+        db_session.add_all([other_commodity, other_market])
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, other_commodity.id, other_market.id, date(2025, 1, 20), "80.00")
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/?category=fruit&region=region%20iv-a")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["commodity"]["name"] == "Filtered Banana"
+        assert data["items"][0]["market"]["region"] == "Region IV-A"
+
+    def test_get_daily_prices_filters_by_date_range(self, client, db_session, sample_commodity, sample_market):
+        """Test historical date-range queries are inclusive."""
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 18), "110.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "120.00")
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/?start_date=2025-01-15&end_date=2025-01-18")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert [item["report_date"] for item in data["items"]] == ["2025-01-18", "2025-01-15"]
+
+    def test_get_daily_prices_rejects_invalid_date_combinations(self, client):
+        """Test mutually exclusive date modes are rejected."""
+        response = client.get("/api/v1/prices/?report_date=2025-01-20&start_date=2025-01-15")
+        assert response.status_code == 422
+
+        response = client.get("/api/v1/prices/?start_date=2025-01-20&end_date=2025-01-15")
+        assert response.status_code == 422
+
+    def test_get_daily_prices_invalid_filter_uuid(self, client):
+        """Test malformed filter UUIDs return validation errors."""
+        response = client.get("/api/v1/prices/?commodity_id=not-a-uuid")
+        assert response.status_code == 422
+
+    def test_export_prices_csv_respects_filters_and_range_filename(
+        self, client, db_session, sample_commodity, sample_market
+    ):
+        """Test CSV export uses the same filters and range filename semantics as /prices."""
+        other_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(other_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, other_commodity.id, sample_market.id, date(2025, 1, 18), "80.00")
+        _add_price(db_session, other_commodity.id, sample_market.id, date(2025, 1, 20), "90.00")
+        db_session.commit()
+
+        response = client.get(
+            f"/api/v1/prices/export?commodity_id={other_commodity.id}&start_date=2025-01-18&end_date=2025-01-20"
+        )
+        assert response.status_code == 200
+        assert 'filename=prices_2025-01-18_to_2025-01-20.csv' in response.headers["content-disposition"]
+        assert "Filtered Banana" in response.text
+        assert "2025-01-18" in response.text
+        assert "2025-01-20" in response.text
+        assert "Test Rice" not in response.text
+
+    def test_get_daily_prices_supports_compact_view(self, client, db_session, sample_commodity, sample_market):
+        """Test compact view returns flat price items."""
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/?view=compact")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["items"][0]["commodity_name"] == "Test Rice"
+        assert data["items"][0]["market_name"] == "Test Market"
+        assert "commodity" not in data["items"][0]
+        assert "market" not in data["items"][0]
+
+    def test_get_daily_prices_sorts_by_commodity_name(self, client, db_session, sample_market):
+        """Test sorting by commodity name is supported."""
+        rice = Commodity(id=uuid4(), name="Rice", category="Grain", unit="kg")
+        banana = Commodity(id=uuid4(), name="Banana", category="Fruit", unit="kg")
+        db_session.add_all([rice, banana])
+
+        _add_price(db_session, rice.id, sample_market.id, date(2025, 1, 20), "100.00")
+        _add_price(db_session, banana.id, sample_market.id, date(2025, 1, 20), "80.00")
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/?sort_by=commodity_name&sort_order=asc")
+        assert response.status_code == 200
+        data = response.json()
+        assert [item["commodity"]["name"] for item in data["items"]] == ["Banana", "Rice"]
+
+    def test_get_daily_prices_sorts_by_prevailing_price(self, client, db_session, sample_commodity, sample_market):
+        """Test sorting by prevailing price uses ascending or descending ordering."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 20), "80.00")
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/?sort_by=prevailing_price&sort_order=asc")
+        assert response.status_code == 200
+        data = response.json()
+        assert [item["commodity"]["name"] for item in data["items"]] == ["Filtered Banana", "Test Rice"]
+
+    def test_get_daily_prices_rejects_invalid_view_and_sort_params(self, client):
+        """Test invalid sort and view params return validation errors."""
+        response = client.get("/api/v1/prices/?view=summary")
+        assert response.status_code == 422
+
+        response = client.get("/api/v1/prices/?sort_by=price_low")
+        assert response.status_code == 422
+
+        response = client.get("/api/v1/prices/?sort_order=sideways")
+        assert response.status_code == 422
+
+    def test_export_prices_csv_respects_sort_order(self, client, db_session, sample_market):
+        """Test CSV export uses the same sorting contract as /prices."""
+        rice = Commodity(id=uuid4(), name="Rice", category="Grain", unit="kg")
+        banana = Commodity(id=uuid4(), name="Banana", category="Fruit", unit="kg")
+        db_session.add_all([rice, banana])
+
+        _add_price(db_session, rice.id, sample_market.id, date(2025, 1, 20), "100.00")
+        _add_price(db_session, banana.id, sample_market.id, date(2025, 1, 20), "80.00")
+        db_session.commit()
+
+        response = client.get("/api/v1/prices/export?sort_by=commodity_name&sort_order=asc")
+        assert response.status_code == 200
+        lines = response.text.splitlines()
+        assert '"Banana"' in lines[1]
+        assert '"Rice"' in lines[2]
+
 
 class TestStatsAPI:
     """Tests for /api/v1/stats endpoints."""
@@ -459,6 +627,80 @@ class TestTrendsAPI:
         assert data["points"][1]["prevailing_price"] == "140.00"
         assert data["points"][1]["market_count"] == 2
 
+    def test_market_trend_summary_aggregated(self, client, db_session, sample_commodity, sample_market):
+        """Test aggregated market trend summary uses commodity averages."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        response = client.get(f"/api/v1/trends/markets/{sample_market.id}/summary")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["latest_report_date"] == "2025-01-20"
+        assert data["previous_report_date"] == "2025-01-15"
+        assert data["current_prevailing_price"] == "140.00"
+        assert data["previous_prevailing_price"] == "110.00"
+        assert data["absolute_change"] == "30.00"
+        assert data["percent_change"] == 27.3
+        assert data["commodity_count"] == 2
+
+    def test_market_trend_summary_for_specific_commodity(self, client, db_session, sample_commodity, sample_market):
+        """Test commodity-specific market summary uses only the requested commodity."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        response = client.get(f"/api/v1/trends/markets/{sample_market.id}/summary?commodity_id={sample_commodity.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["current_prevailing_price"] == "130.00"
+        assert data["previous_prevailing_price"] == "100.00"
+        assert data["absolute_change"] == "30.00"
+        assert data["percent_change"] == 30.0
+        assert data["commodity_count"] == 1
+
+    def test_market_trend_summary_invalid_commodity_id(self, client, sample_market):
+        """Test malformed commodity IDs on market trend summary return a validation error."""
+        response = client.get(f"/api/v1/trends/markets/{sample_market.id}/summary?commodity_id=not-a-uuid")
+        assert response.status_code == 422
+
+    def test_market_trend_summary_not_found(self, client, sample_market):
+        """Test market summary returns 404 when the market has no price history."""
+        response = client.get(f"/api/v1/trends/markets/{sample_market.id}/summary")
+        assert response.status_code == 404
+
+    def test_market_trend_series_returns_points(self, client, db_session, sample_commodity, sample_market):
+        """Test market trend series returns chronological aggregated points."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 18), "110.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 18), "130.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        response = client.get(f"/api/v1/trends/markets/{sample_market.id}/series?limit=2")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["points"]) == 2
+        assert data["points"][0]["report_date"] == "2025-01-18"
+        assert data["points"][1]["report_date"] == "2025-01-20"
+        assert data["points"][1]["prevailing_price"] == "140.00"
+        assert data["points"][1]["commodity_count"] == 2
+
 
 class TestMetaAPI:
     """Tests for API metadata endpoints."""
@@ -512,3 +754,53 @@ class TestMetaAPI:
         """Test legacy HTML routes are no longer exposed."""
         assert client.get("/markets").status_code == 404
         assert client.get("/analytics").status_code == 404
+
+
+class TestAdminAPI:
+    """Tests for admin-only operational endpoints."""
+
+    def test_list_ingestion_runs_requires_api_key(self, client):
+        response = client.get("/api/v1/admin/ingestion-runs")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "API key required"
+
+    def test_list_ingestion_runs_rejects_service_scope(self, client, auth_headers):
+        response = client.get("/api/v1/admin/ingestion-runs", headers=auth_headers)
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Insufficient API key scope"
+
+    def test_list_ingestion_runs_returns_recent_runs(self, client, db_session, admin_auth_headers):
+        from app.models.ingestion_run import IngestionRun
+
+        first = IngestionRun(
+            task_name="discover_and_scrape",
+            status="success",
+            entries_total=1,
+            entries_processed=1,
+            anomaly_count=0,
+            anomaly_flags=[],
+            started_at=datetime(2025, 1, 20, 8, 0, 0, tzinfo=UTC).replace(tzinfo=None),
+        )
+        second = IngestionRun(
+            task_name="scrape_daily_prices",
+            status="partial_success",
+            entries_total=100,
+            entries_processed=98,
+            entries_inserted=80,
+            entries_updated=10,
+            entries_skipped=8,
+            error_count=2,
+            anomaly_count=1,
+            anomaly_flags=["duplicate_entries_in_source:2"],
+            started_at=datetime(2025, 1, 20, 9, 0, 0, tzinfo=UTC).replace(tzinfo=None),
+        )
+        db_session.add_all([first, second])
+        db_session.commit()
+
+        response = client.get("/api/v1/admin/ingestion-runs", headers=admin_auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert data["items"][0]["task_name"] == "scrape_daily_prices"
+        assert data["items"][0]["anomaly_count"] == 1
+        assert data["items"][0]["anomaly_flags"] == ["duplicate_entries_in_source:2"]

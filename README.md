@@ -75,17 +75,21 @@ The system provides farmers, consumers, policymakers, and developers with real-t
 - `GET /api/v1/commodities` - Paginated commodities with `items`, `total`, `skip`, `limit`; filter with `category` or search with `q`
 - `GET /api/v1/commodities/{commodity_id}/history` - Commodity price history
 - `GET /api/v1/markets` - Paginated markets with `items`, `total`, `skip`, `limit`; search with `q`
-- `GET /api/v1/prices` - Paginated latest-report snapshot or date-filtered prices
-- `GET /api/v1/prices/export` - Export prices as CSV
+- `GET /api/v1/prices` - Paginated prices filtered by snapshot/date range, commodity, market, category, and region; supports `sort_by`, `sort_order`, and `view=compact`
+- `GET /api/v1/prices/export` - CSV export with the same filter and sorting contract as `/api/v1/prices`
 - `GET /api/v1/stats/dashboard` - Aggregate counts plus `latest_report_date`, `previous_report_date`, and snapshot deltas
 - `GET /api/v1/trends/commodities/{commodity_id}/summary` - Commodity trend summary, optionally scoped to a market
 - `GET /api/v1/trends/commodities/{commodity_id}/series` - Chronological commodity trend points, aggregated across markets by default
-- `POST /api/v1/commodities` and `POST /api/v1/markets` - Create resources, returning `201 Created`; requires `X-API-Key`
+- `GET /api/v1/trends/markets/{market_id}/summary` - Market trend summary, optionally scoped to a commodity
+- `GET /api/v1/trends/markets/{market_id}/series` - Chronological market trend points, aggregated across commodities by default
+- `GET /api/v1/admin/ingestion-runs` - Recent ingestion-run summaries for operations; requires an admin-scoped `X-API-Key`
+- `POST /api/v1/commodities` and `POST /api/v1/markets` - Create resources, returning `201 Created`; requires a service- or admin-scoped `X-API-Key`
 
 ### Authentication
 
-- Protected write routes require the `X-API-Key` header.
-- Configure the server-side key with `API_KEY` in `.env`.
+- Protected routes use the `X-API-Key` header.
+- Configure service and admin keys with `SERVICE_API_KEYS` and `ADMIN_API_KEYS` as JSON maps in `.env`.
+- Legacy `API_KEY` remains supported as a compatibility fallback and is treated as a service-scoped key.
 - Rate limiting uses in-memory storage by default for local development. Set `RATE_LIMIT_STORAGE_URL` to a Redis URL for shared/distributed rate limits.
 - Example: `X-API-Key: your-secret-key`
 
@@ -114,9 +118,9 @@ Production uses:
 - `python scripts/cleanup_duplicates.py --apply` - Deterministic duplicate cleanup for local/admin use
 - `python scripts/backfill_prices.py --start-date 2026-03-01 --end-date 2026-03-05` - Backfill DA PDFs over a date range
 - `python scripts/backfill_prices.py --url <pdf-url>` - Backfill explicit PDF URLs
-- `python scripts/health_check.py` - Check Postgres, Redis, schema head state, worker reachability, beat freshness, and ingestion freshness
+- `python scripts/health_check.py` - Check Postgres, Redis, schema head state, worker reachability, beat freshness, ingestion freshness, and ingestion anomalies
 - `python scripts/health_check.py --mode ready` - Readiness-only check for API health probes
-- `python scripts/check_alerts.py` - Exit non-zero when ingestion is stale or the latest ingestion run failed
+- `python scripts/check_alerts.py` - Exit non-zero when ingestion is stale, anomalous, or the latest ingestion run failed
 
 ## Contributing
 

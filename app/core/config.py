@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     # Authentication
     API_KEY: Optional[str] = None  # Optional API key for protected endpoints
     API_KEY_HEADER: str = "X-API-Key"
+    SERVICE_API_KEYS: Dict[str, str] = {}
+    ADMIN_API_KEYS: Dict[str, str] = {}
 
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = 100  # Max requests per window
@@ -49,6 +51,10 @@ class Settings(BaseSettings):
     CACHE_TTL_SHORT: int = 60  # 1 minute
     CACHE_TTL_MEDIUM: int = 300  # 5 minutes
     CACHE_TTL_LONG: int = 3600  # 1 hour
+    INGESTION_ANOMALY_LOOKBACK_RUNS: int = 5
+    INGESTION_ANOMALY_ROW_COUNT_RATIO_THRESHOLD: float = 0.6
+    INGESTION_ANOMALY_MISSING_PREVAILING_RATIO_THRESHOLD: float = 0.25
+    INGESTION_ALERT_MAX_ANOMALIES: int = 0
 
     @property
     def is_production(self) -> bool:
@@ -91,6 +97,19 @@ class Settings(BaseSettings):
         """Get async database URL using asyncpg driver."""
         sync_url = self.sync_database_url
         return sync_url.replace("postgresql://", "postgresql+asyncpg://")
+
+    @property
+    def protected_api_keys(self) -> Dict[str, Dict[str, str]]:
+        service_keys = dict(self.SERVICE_API_KEYS)
+        admin_keys = dict(self.ADMIN_API_KEYS)
+        if self.API_KEY and not service_keys and not admin_keys:
+            service_keys = {"legacy": self.API_KEY}
+        return {"service": service_keys, "admin": admin_keys}
+
+    @property
+    def has_protected_api_keys(self) -> bool:
+        keys = self.protected_api_keys
+        return bool(keys["service"] or keys["admin"])
 
 
 # Create settings instance and explicitly load .env if necessary

@@ -16,6 +16,7 @@ from app.db.session import get_db
 from app.main import app
 
 TEST_API_KEY = "test-api-key"
+TEST_ADMIN_API_KEY = "test-admin-api-key"
 
 # Default to in-memory SQLite for tests so the suite does not depend on a local
 # PostgreSQL instance. TEST_DATABASE_URL can still override this when needed.
@@ -34,17 +35,29 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 def configure_test_api_key():
     """Ensure protected write endpoints require a deterministic test API key."""
     original_api_key = settings.API_KEY
-    settings.API_KEY = TEST_API_KEY
+    original_service_api_keys = dict(settings.SERVICE_API_KEYS)
+    original_admin_api_keys = dict(settings.ADMIN_API_KEYS)
+    settings.API_KEY = None
+    settings.SERVICE_API_KEYS = {"test-service": TEST_API_KEY}
+    settings.ADMIN_API_KEYS = {"test-admin": TEST_ADMIN_API_KEY}
     try:
         yield
     finally:
         settings.API_KEY = original_api_key
+        settings.SERVICE_API_KEYS = original_service_api_keys
+        settings.ADMIN_API_KEYS = original_admin_api_keys
 
 
 @pytest.fixture
 def auth_headers():
     """Headers for authenticated write requests."""
     return {settings.API_KEY_HEADER: TEST_API_KEY}
+
+
+@pytest.fixture
+def admin_auth_headers():
+    """Headers for admin-only endpoints."""
+    return {settings.API_KEY_HEADER: TEST_ADMIN_API_KEY}
 
 
 @pytest.fixture(scope="function")

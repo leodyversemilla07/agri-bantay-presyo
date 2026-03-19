@@ -14,3 +14,9 @@ class TestSettings:
         assert settings.CELERY_WORKER_POOL == "prefork"
         assert settings.CELERY_WORKER_CONCURRENCY == 2
         assert settings.CELERY_BEAT_SCHEDULE_FILE == "/app/data/celerybeat-schedule"
+
+    def test_legacy_api_key_backfills_service_scope(self):
+        settings = Settings(_env_file=None, API_KEY="legacy-key")
+
+        assert settings.protected_api_keys["service"] == {"legacy": "legacy-key"}
+        assert settings.protected_api_keys["admin"] == {}

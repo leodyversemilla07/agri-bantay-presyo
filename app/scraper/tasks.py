@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from statistics import median
 from datetime import date, datetime
 
 from app.core.celery_app import celery_app
@@ -32,6 +33,54 @@ def _normalize_report_date(value):
     return None
 
 
+def _normalize_name(value: str | None, default: str = "Unknown") -> str:
+    return " ".join((value or default).split())
+
+
+def _build_anomaly_flags(db, parsed_results, report_date):
+    anomaly_flags: list[str] = []
+
+    if report_date is None:
+        anomaly_flags.append("missing_report_date")
+
+    seen = set()
+    duplicate_count = 0
+    for entry in parsed_results:
+        identity = (
+            _normalize_name(entry.get("_normalized_name") or entry.get("commodity")).lower(),
+            _normalize_name(entry.get("market"), settings.DEFAULT_MARKET_NAME).lower(),
+            str(_normalize_report_date(entry.get("report_date"))),
+            entry.get("report_type", "DAILY_RETAIL"),
+        )
+        if identity in seen:
+            duplicate_count += 1
+        else:
+            seen.add(identity)
+    if duplicate_count:
+        anomaly_flags.append(f"duplicate_entries_in_source:{duplicate_count}")
+
+    missing_prevailing_count = sum(1 for entry in parsed_results if entry.get("price_prevailing") is None)
+    if parsed_results:
+        missing_ratio = missing_prevailing_count / len(parsed_results)
+        if missing_ratio >= settings.INGESTION_ANOMALY_MISSING_PREVAILING_RATIO_THRESHOLD:
+            anomaly_flags.append(
+                f"high_missing_prevailing_ratio:{missing_prevailing_count}/{len(parsed_results)}"
+            )
+
+    baseline_runs = IngestionRunService.get_recent_successful_scrapes(
+        db,
+        limit=settings.INGESTION_ANOMALY_LOOKBACK_RUNS,
+    )
+    baseline_counts = [run.entries_total for run in baseline_runs if run.entries_total]
+    if baseline_counts:
+        baseline_median = int(median(baseline_counts))
+        threshold = max(1, int(baseline_median * settings.INGESTION_ANOMALY_ROW_COUNT_RATIO_THRESHOLD))
+        if len(parsed_results) < threshold:
+            anomaly_flags.append(f"low_row_count:{len(parsed_results)}<baseline_threshold:{threshold}")
+
+    return anomaly_flags
+
+
 @celery_app.task(
     name="app.scraper.tasks.scrape_daily_prices",
     bind=True,
@@ -55,6 +104,9 @@ def scrape_daily_prices(self, url: str):
     db = SessionLocal()
     pdf_path = None
     entries_processed = 0
+    entries_inserted = 0
+    entries_updated = 0
+    entries_skipped = 0
     run = IngestionRunService.start_run(
         db,
         task_name="scrape_daily_prices",
@@ -110,6 +162,7 @@ def scrape_daily_prices(self, url: str):
             return {"status": "empty", "url": url, "entries": 0}
 
         report_date = _normalize_report_date(parsed_results[0].get("report_date"))
+        anomaly_flags = _build_anomaly_flags(db, parsed_results, report_date)
 
         # Pre-process entries to normalize names and identify unique commodities
         unique_commodity_names = set()
@@ -126,7 +179,6 @@ def scrape_daily_prices(self, url: str):
         # Bulk fetch existing commodities
         existing_commodities = CommodityService.get_by_names(db, list(unique_commodity_names))
         commodity_map = {c.name: c for c in existing_commodities}
-
         # Create missing commodities
         for name in unique_commodity_names:
             if name not in commodity_map:
@@ -162,13 +214,15 @@ def scrape_daily_prices(self, url: str):
 
                 # Use configurable default market from settings
                 market_name = entry.get("market", settings.DEFAULT_MARKET_NAME)
-                market = MarketService.get_or_create(db, name=market_name)
+                market = MarketService.get_by_name(db, market_name)
+                if market is None:
+                    market = MarketService.get_or_create(db, name=market_name)
 
                 report_date = _normalize_report_date(entry.get("report_date"))
                 if report_date is None:
                     raise ValueError("Invalid report_date (expected ISO date or date object)")
 
-                PriceService.create_entry(
+                _, action = PriceService.upsert_entry(
                     db,
                     {
                         "commodity_id": commodity.id,
@@ -183,6 +237,12 @@ def scrape_daily_prices(self, url: str):
                     },
                 )
                 entries_processed += 1
+                if action == "inserted":
+                    entries_inserted += 1
+                elif action == "updated":
+                    entries_updated += 1
+                else:
+                    entries_skipped += 1
 
             except Exception as entry_error:
                 entry_name = entry.get("commodity", "Unknown")
@@ -197,6 +257,7 @@ def scrape_daily_prices(self, url: str):
                     },
                 )
                 continue  # Continue processing other entries
+        anomaly_flags = list(dict.fromkeys(anomaly_flags))
 
         logger.info(
             "Daily scrape completed",
@@ -210,7 +271,12 @@ def scrape_daily_prices(self, url: str):
                 "status": "success" if not errors else "partial_success",
                 "entries_total": len(parsed_results),
                 "entries_processed": entries_processed,
+                "entries_inserted": entries_inserted,
+                "entries_updated": entries_updated,
+                "entries_skipped": entries_skipped,
                 "error_count": len(errors),
+                "anomaly_count": len(anomaly_flags),
+                "anomaly_flags": anomaly_flags,
                 "elapsed_seconds": round(time.monotonic() - started_at, 3),
             },
         )
@@ -233,7 +299,12 @@ def scrape_daily_prices(self, url: str):
             report_date=report_date,
             entries_total=len(parsed_results),
             entries_processed=entries_processed,
+            entries_inserted=entries_inserted,
+            entries_updated=entries_updated,
+            entries_skipped=entries_skipped,
             error_count=len(errors),
+            anomaly_count=len(anomaly_flags),
+            anomaly_flags=anomaly_flags,
             error_message=None if not errors else f"{len(errors)} entries failed during processing",
         )
 
@@ -279,7 +350,12 @@ def scrape_daily_prices(self, url: str):
             report_date=report_date,
             entries_total=entries_processed,
             entries_processed=entries_processed,
+            entries_inserted=entries_inserted,
+            entries_updated=entries_updated,
+            entries_skipped=entries_skipped,
             error_count=1,
+            anomaly_count=0,
+            anomaly_flags=[],
             error_message=e.message,
         )
         # Clean up on failure
@@ -287,7 +363,7 @@ def scrape_daily_prices(self, url: str):
             os.remove(pdf_path)
         raise  # Let Celery handle retry
 
-    except Exception:
+    except Exception as e:
         logger.exception(
             "Unexpected error during scraping",
             extra={
@@ -309,7 +385,12 @@ def scrape_daily_prices(self, url: str):
             report_date=report_date,
             entries_total=entries_processed,
             entries_processed=entries_processed,
+            entries_inserted=entries_inserted,
+            entries_updated=entries_updated,
+            entries_skipped=entries_skipped,
             error_count=1,
+            anomaly_count=0,
+            anomaly_flags=[],
             error_message=str(e),
         )
         # Clean up on failure

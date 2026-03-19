@@ -81,6 +81,9 @@ def get_operational_health_status() -> dict:
         "latest_successful_ingestion": None,
         "latest_ingestion_failure": None,
         "ingestion_is_fresh": False,
+        "latest_ingestion_has_anomalies": False,
+        "latest_ingestion_anomaly_count": 0,
+        "latest_ingestion_anomaly_flags": [],
     }
 
     db = SessionLocal()
@@ -97,7 +100,17 @@ def get_operational_health_status() -> dict:
                 "source_file": latest_success.source_file,
                 "report_date": str(latest_success.report_date) if latest_success.report_date else None,
                 "finished_at": latest_success.finished_at.isoformat() if latest_success.finished_at else None,
+                "entries_total": latest_success.entries_total,
+                "entries_processed": latest_success.entries_processed,
+                "entries_inserted": latest_success.entries_inserted,
+                "entries_updated": latest_success.entries_updated,
+                "entries_skipped": latest_success.entries_skipped,
+                "anomaly_count": latest_success.anomaly_count or 0,
+                "anomaly_flags": latest_success.anomaly_flags or [],
             }
+            status["latest_ingestion_anomaly_count"] = latest_success.anomaly_count or 0
+            status["latest_ingestion_anomaly_flags"] = latest_success.anomaly_flags or []
+            status["latest_ingestion_has_anomalies"] = (latest_success.anomaly_count or 0) > settings.INGESTION_ALERT_MAX_ANOMALIES
             if latest_success.finished_at:
                 fresh_after = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=settings.INGESTION_STALENESS_HOURS)
                 status["ingestion_is_fresh"] = latest_success.finished_at >= fresh_after

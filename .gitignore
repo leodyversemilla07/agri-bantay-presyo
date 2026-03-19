@@ -96,6 +96,9 @@ __pypa__/
 
 # Celery stuff
 celerybeat-schedule
+celerybeat-schedule.*
+celerybeat-schedule.local
+celerybeat-schedule.local.*
 celerybeat.pid
 
 # SageMath parsed files

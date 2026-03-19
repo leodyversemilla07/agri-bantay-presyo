@@ -55,10 +55,10 @@ logger.info(
     "Rate limiting configured",
     extra={"event": "rate_limit_configured"},
 )
-if settings.API_KEY:
-    logger.info("API key authentication is enabled", extra={"event": "api_key_enabled"})
+if settings.has_protected_api_keys:
+    logger.info("Protected endpoint authentication is enabled", extra={"event": "api_key_enabled"})
 else:
     logger.warning(
-        "API key authentication is not configured; protected write endpoints will reject requests",
+        "Protected endpoint authentication is not configured; protected routes will reject requests",
         extra={"event": "api_key_missing"},
     )

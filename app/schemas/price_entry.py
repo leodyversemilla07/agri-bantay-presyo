@@ -33,3 +33,27 @@ class PriceEntry(PriceEntryBase):
     market: Optional[Market] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PriceEntryCompact(BaseModel):
+    id: UUID
+    commodity_id: UUID
+    commodity_name: str
+    category: Optional[str] = None
+    market_id: UUID
+    market_name: str
+    region: Optional[str] = None
+    report_date: date
+    price_low: Optional[Decimal] = None
+    price_high: Optional[Decimal] = None
+    price_prevailing: Optional[Decimal] = None
+
+
+PriceEntryListItem = PriceEntry | PriceEntryCompact
+
+
+class PaginatedPriceResponse(BaseModel):
+    items: list[PriceEntryListItem]
+    total: int
+    skip: int
+    limit: int

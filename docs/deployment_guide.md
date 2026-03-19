@@ -37,6 +37,10 @@ APP_ENV=development
 LOG_LEVEL=INFO
 LOG_AS_JSON=false
 
+# Auth
+SERVICE_API_KEYS={"local-service":"change-me"}
+ADMIN_API_KEYS={"local-admin":"change-me-admin"}
+
 # Database
 DATABASE_URL=postgresql://postgres:password@localhost:5432/bantay_presyo
 POSTGRES_SERVER=localhost
@@ -57,6 +61,10 @@ CELERY_BEAT_SCHEDULE_FILE=celerybeat-schedule.local
 # Operational checks
 WAIT_FOR_SERVICES_TIMEOUT_SECONDS=60
 INGESTION_STALENESS_HOURS=36
+INGESTION_ANOMALY_LOOKBACK_RUNS=5
+INGESTION_ANOMALY_ROW_COUNT_RATIO_THRESHOLD=0.6
+INGESTION_ANOMALY_MISSING_PREVAILING_RATIO_THRESHOLD=0.25
+INGESTION_ALERT_MAX_ANOMALIES=0
 ```
 
 ### Variable Descriptions
@@ -68,12 +76,18 @@ INGESTION_STALENESS_HOURS=36
 | `APP_ENV` | No | Runtime environment (`development` or `production`) |
 | `LOG_LEVEL` | No | Standard log level (`INFO`, `WARNING`, etc.) |
 | `LOG_AS_JSON` | No | Emit structured JSON logs (enabled by default in production) |
+| `SERVICE_API_KEYS` | No | JSON object of service-scoped API keys for protected write routes |
+| `ADMIN_API_KEYS` | No | JSON object of admin-scoped API keys for operational endpoints |
 | `RATE_LIMIT_STORAGE_URL` | No | Storage backend for rate limiting (default: `memory://`, set to Redis for shared limits) |
 | `CELERY_WORKER_POOL` | No | Celery worker pool mode (`solo` locally on Windows, `prefork` in production) |
 | `CELERY_WORKER_CONCURRENCY` | No | Celery worker concurrency (`2` by default in production) |
 | `CELERY_BEAT_SCHEDULE_FILE` | No | Beat schedule filename (defaults to `/app/data/celerybeat-schedule` in production) |
 | `WAIT_FOR_SERVICES_TIMEOUT_SECONDS` | No | Timeout for dependency wait checks before process startup |
 | `INGESTION_STALENESS_HOURS` | No | Maximum age for the latest successful ingestion before health checks fail |
+| `INGESTION_ANOMALY_LOOKBACK_RUNS` | No | Number of recent healthy scrapes used as the row-count anomaly baseline |
+| `INGESTION_ANOMALY_ROW_COUNT_RATIO_THRESHOLD` | No | Minimum fraction of baseline row count before a scrape is flagged as anomalously small |
+| `INGESTION_ANOMALY_MISSING_PREVAILING_RATIO_THRESHOLD` | No | Maximum allowed share of rows missing `price_prevailing` before a scrape is flagged |
+| `INGESTION_ALERT_MAX_ANOMALIES` | No | Maximum allowed anomaly count on the latest successful ingestion before alerts fail |
 | `POSTGRES_SERVER` | No | PostgreSQL host (default: localhost) |
 | `POSTGRES_USER` | No | PostgreSQL user (default: postgres) |
 | `POSTGRES_PASSWORD` | No | PostgreSQL password (default: password) |
@@ -147,6 +161,7 @@ On Windows, the default Celery configuration uses a `solo` worker pool. The beat
 - **Test Suite**: `pytest -q` (defaults to in-memory SQLite unless `TEST_DATABASE_URL` is set)
 - **Admin Health Script**: `python scripts/health_check.py`
 - **Readiness Probe**: `GET /health/ready`
+- **Admin Runs API**: `GET /api/v1/admin/ingestion-runs` with an admin-scoped `X-API-Key`
 
 ---
 
@@ -300,6 +315,8 @@ For production, use strong passwords and secure your environment variables:
 ```env
 APP_ENV=production
 LOG_AS_JSON=true
+SERVICE_API_KEYS={"deploy":"change-me"}
+ADMIN_API_KEYS={"ops":"change-me-admin"}
 APP_DOMAIN=prices.example.com
 APP_IMAGE=ghcr.io/owner/agri-bantay-presyo:sha-<git-sha>
 DATABASE_URL=postgresql://bantay_user:STRONG_PASSWORD_HERE@db:5432/bantay_presyo
@@ -308,6 +325,7 @@ RATE_LIMIT_STORAGE_URL=redis://redis:6379/1
 CELERY_WORKER_POOL=prefork
 CELERY_WORKER_CONCURRENCY=2
 CELERY_BEAT_SCHEDULE_FILE=/app/data/celerybeat-schedule
+INGESTION_ALERT_MAX_ANOMALIES=0
 ```
 
 ---
@@ -338,6 +356,9 @@ curl http://localhost:8000/health/ready
 # Full operational check from inside the API container
 docker compose -f docker-compose.prod.yml --env-file .env.production exec -T api \
   python scripts/health_check.py --production
+
+# Recent ingestion runs through the admin API
+curl -H "X-API-Key: <admin-key>" http://localhost:8000/api/v1/admin/ingestion-runs
 
 # Check running containers
 docker compose -f docker-compose.prod.yml --env-file .env.production ps
@@ -395,7 +416,7 @@ discover_and_scrape()
 "
 ```
 
-To fail a cron or monitoring check when ingestion is stale:
+To fail a cron or monitoring check when ingestion is stale, failed, or anomalous:
 
 ```bash
 python scripts/check_alerts.py

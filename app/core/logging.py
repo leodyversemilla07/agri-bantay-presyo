@@ -28,7 +28,12 @@ class JsonLogFormatter(logging.Formatter):
             "status",
             "entries_total",
             "entries_processed",
+            "entries_inserted",
+            "entries_updated",
+            "entries_skipped",
             "error_count",
+            "anomaly_count",
+            "anomaly_flags",
             "elapsed_seconds",
             "schema_at_head",
         ):

@@ -1,10 +1,10 @@
 import uuid
 
-from sqlalchemy import Column, Date, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Column, Date, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
-from app.db.types import GUID
+from app.db.types import GUID, ScaledDecimal
 
 
 class PriceEntry(Base):
@@ -15,10 +15,10 @@ class PriceEntry(Base):
     market_id = Column(GUID(), ForeignKey("markets.id"), nullable=False)
     report_date = Column(Date, index=True, nullable=False)
 
-    price_low = Column(Numeric(10, 2))
-    price_high = Column(Numeric(10, 2))
-    price_prevailing = Column(Numeric(10, 2))
-    price_average = Column(Numeric(10, 2))
+    price_low = Column(ScaledDecimal(10, 2))
+    price_high = Column(ScaledDecimal(10, 2))
+    price_prevailing = Column(ScaledDecimal(10, 2))
+    price_average = Column(ScaledDecimal(10, 2))
     period_start = Column(Date)
     period_end = Column(Date)
 

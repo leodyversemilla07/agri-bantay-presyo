@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.commodity import Commodity
 from app.models.market import Market
 from app.models.price_entry import PriceEntry
+from app.schemas.price_filters import PriceFilters, PriceSortField, SortOrder
 from app.services.price_service import PriceService
 
 
@@ -347,6 +348,202 @@ class TestPriceService:
         assert points[0]["prevailing_price"] == Decimal("120.00")
         assert points[1]["prevailing_price"] == Decimal("140.00")
         assert points[1]["market_count"] == 2
+
+    def test_get_filtered_prices_defaults_to_latest_snapshot_within_filtered_slice(
+        self, db_session, sample_commodity, sample_market
+    ):
+        """Test filtered latest-snapshot queries resolve the latest date within the filtered result set."""
+        other_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(other_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, other_commodity.id, sample_market.id, date(2025, 1, 15), "80.00")
+        db_session.commit()
+
+        results = PriceService.get_filtered_prices(db_session, filters=PriceFilters(commodity_id=other_commodity.id))
+
+        assert len(results) == 1
+        assert results[0].commodity_id == other_commodity.id
+        assert results[0].report_date == date(2025, 1, 15)
+
+    def test_get_filtered_prices_supports_inclusive_date_ranges(self, db_session, sample_commodity, sample_market):
+        """Test date-range filters are inclusive on both bounds."""
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 18), "110.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "120.00")
+        db_session.commit()
+
+        results = PriceService.get_filtered_prices(
+            db_session,
+            filters=PriceFilters(start_date=date(2025, 1, 15), end_date=date(2025, 1, 18)),
+            limit=None,
+        )
+
+        assert [entry.report_date for entry in results] == [date(2025, 1, 18), date(2025, 1, 15)]
+
+    def test_get_filtered_prices_filters_category_and_region_case_insensitively(
+        self, db_session, sample_commodity, sample_market
+    ):
+        """Test category and region filters are case-insensitive exact matches."""
+        other_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        other_market = Market(id=uuid4(), name="South Market", region="Region IV-A", city="Calamba")
+        db_session.add_all([other_commodity, other_market])
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, other_commodity.id, other_market.id, date(2025, 1, 20), "80.00")
+        db_session.commit()
+
+        results = PriceService.get_filtered_prices(
+            db_session,
+            filters=PriceFilters(category="fruit", region="region iv-a"),
+            limit=None,
+        )
+
+        assert len(results) == 1
+        assert results[0].commodity_id == other_commodity.id
+        assert results[0].market_id == other_market.id
+
+    def test_get_filtered_prices_sorts_by_commodity_name(self, db_session, sample_market):
+        """Test commodity-name sorting orders rows predictably."""
+        rice = Commodity(id=uuid4(), name="Rice", category="Grain", unit="kg")
+        banana = Commodity(id=uuid4(), name="Banana", category="Fruit", unit="kg")
+        db_session.add_all([rice, banana])
+
+        _add_price(db_session, rice.id, sample_market.id, date(2025, 1, 20), "100.00")
+        _add_price(db_session, banana.id, sample_market.id, date(2025, 1, 20), "80.00")
+        db_session.commit()
+
+        results = PriceService.get_filtered_prices(
+            db_session,
+            filters=PriceFilters(sort_by=PriceSortField.COMMODITY_NAME, sort_order=SortOrder.ASC),
+            limit=None,
+        )
+
+        assert [item.commodity.name for item in results] == ["Banana", "Rice"]
+
+    def test_get_filtered_prices_sorts_by_prevailing_price_with_average_fallback(self, db_session, sample_commodity, sample_market):
+        """Test prevailing-price sorting falls back to price_average when prevailing is missing."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        first = PriceEntry(
+            commodity_id=sample_commodity.id,
+            market_id=sample_market.id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=None,
+            price_average=Decimal("95.00"),
+            report_type="DAILY_RETAIL",
+        )
+        second = PriceEntry(
+            commodity_id=second_commodity.id,
+            market_id=sample_market.id,
+            report_date=date(2025, 1, 20),
+            price_prevailing=Decimal("110.00"),
+            report_type="DAILY_RETAIL",
+        )
+        db_session.add_all([first, second])
+        db_session.commit()
+
+        results = PriceService.get_filtered_prices(
+            db_session,
+            filters=PriceFilters(sort_by=PriceSortField.PREVAILING_PRICE, sort_order=SortOrder.ASC),
+            limit=None,
+        )
+
+        assert [item.commodity.name for item in results] == ["Test Rice", "Filtered Banana"]
+
+    def test_to_compact_prices_returns_flat_items(self, db_session, sample_commodity, sample_market):
+        """Test compact mapping removes nested commodity/market objects."""
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        db_session.commit()
+
+        prices = PriceService.get_filtered_prices(db_session, filters=PriceFilters(), limit=None)
+        compact_items = PriceService.to_compact_prices(prices)
+
+        assert len(compact_items) == 1
+        assert compact_items[0].commodity_name == "Test Rice"
+        assert compact_items[0].market_name == "Test Market"
+        assert compact_items[0].price_prevailing == Decimal("130.00")
+
+    def test_get_market_trend_summary_aggregates_across_commodities(self, db_session, sample_commodity, sample_market):
+        """Test market summary averages prevailing prices across commodities when commodity_id is omitted."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        summary = PriceService.get_market_trend_summary(db_session, market_id=sample_market.id)
+
+        assert summary["latest_report_date"] == date(2025, 1, 20)
+        assert summary["previous_report_date"] == date(2025, 1, 15)
+        assert summary["current_prevailing_price"] == Decimal("140.00")
+        assert summary["previous_prevailing_price"] == Decimal("110.00")
+        assert summary["absolute_change"] == Decimal("30.00")
+        assert summary["percent_change"] == 27.3
+        assert summary["commodity_count"] == 2
+
+    def test_get_market_trend_summary_for_specific_commodity(self, db_session, sample_commodity, sample_market):
+        """Test commodity-specific market summary does not aggregate across commodities."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        summary = PriceService.get_market_trend_summary(
+            db_session,
+            market_id=sample_market.id,
+            commodity_id=sample_commodity.id,
+        )
+
+        assert summary["current_prevailing_price"] == Decimal("130.00")
+        assert summary["previous_prevailing_price"] == Decimal("100.00")
+        assert summary["absolute_change"] == Decimal("30.00")
+        assert summary["percent_change"] == 30.0
+        assert summary["commodity_count"] == 1
+
+    def test_get_market_trend_summary_without_previous_snapshot_returns_null_changes(
+        self, db_session, sample_commodity, sample_market
+    ):
+        """Test market summary returns null change fields when there is no earlier snapshot."""
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        db_session.commit()
+
+        summary = PriceService.get_market_trend_summary(db_session, market_id=sample_market.id)
+
+        assert summary["previous_report_date"] is None
+        assert summary["previous_prevailing_price"] is None
+        assert summary["absolute_change"] is None
+        assert summary["percent_change"] is None
+
+    def test_get_market_trend_series_returns_chronological_points(self, db_session, sample_commodity, sample_market):
+        """Test market trend series is returned in chronological order."""
+        second_commodity = Commodity(id=uuid4(), name="Filtered Banana", category="Fruit", unit="kg")
+        db_session.add(second_commodity)
+
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 15), "100.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 15), "120.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 18), "110.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 18), "130.00")
+        _add_price(db_session, sample_commodity.id, sample_market.id, date(2025, 1, 20), "130.00")
+        _add_price(db_session, second_commodity.id, sample_market.id, date(2025, 1, 20), "150.00")
+        db_session.commit()
+
+        points = PriceService.get_market_trend_series(db_session, market_id=sample_market.id, limit=2)
+
+        assert len(points) == 2
+        assert points[0]["report_date"] == date(2025, 1, 18)
+        assert points[1]["report_date"] == date(2025, 1, 20)
+        assert points[0]["prevailing_price"] == Decimal("120.00")
+        assert points[1]["prevailing_price"] == Decimal("140.00")
+        assert points[1]["commodity_count"] == 2
 
     def test_db_enforces_unique_price_entry_identity(self, db_session, sample_commodity, sample_market):
         """Test the database rejects duplicate price entries for the same identity tuple."""

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import commodities, markets, prices, stats, trends
+from app.api.v1.endpoints import admin, commodities, markets, prices, stats, trends
 
 api_router = APIRouter()
 api_router.include_router(commodities.router, prefix="/commodities", tags=["commodities"])
@@ -8,3 +8,4 @@ api_router.include_router(markets.router, prefix="/markets", tags=["markets"])
 api_router.include_router(prices.router, prefix="/prices", tags=["prices"])
 api_router.include_router(trends.router, prefix="/trends", tags=["trends"])
 api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])

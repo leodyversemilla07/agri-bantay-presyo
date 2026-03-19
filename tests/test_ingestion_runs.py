@@ -47,7 +47,12 @@ def test_scrape_task_records_successful_ingestion_run(db_session, monkeypatch, t
         assert run.status == "success"
         assert run.report_date == date(2025, 1, 20)
         assert run.entries_processed == 1
+        assert run.entries_inserted == 1
+        assert run.entries_updated == 0
+        assert run.entries_skipped == 0
         assert run.error_count == 0
+        assert run.anomaly_count == 0
+        assert run.anomaly_flags == []
     finally:
         verification_session.close()
 
@@ -71,6 +76,59 @@ def test_scrape_task_records_failed_ingestion_run(db_session, monkeypatch):
         assert result.failed()
         assert run.status == "failed"
         assert "Failed to download PDF" in run.error_message
+        assert run.anomaly_count == 0
+    finally:
+        verification_session.close()
+
+
+def test_scrape_task_records_anomalies_for_duplicate_rows(db_session, monkeypatch, tmp_path):
+    session_factory = _session_factory(db_session.bind)
+    pdf_path = tmp_path / "sample.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 test")
+
+    monkeypatch.setattr("app.scraper.tasks.SessionLocal", session_factory)
+    monkeypatch.setattr("app.scraper.tasks.PDFDownloader.download_pdf_sync", lambda self, url: pdf_path)
+    monkeypatch.setattr(
+        "app.scraper.tasks.PriceParser.parse_daily_prevailing",
+        lambda self, path: [
+            {
+                "commodity": "Bangus",
+                "category": "Fish",
+                "unit": "kg",
+                "market": "Test Market",
+                "price_low": 100.0,
+                "price_high": 120.0,
+                "price_prevailing": 110.0,
+                "price_average": None,
+                "report_date": date(2025, 1, 20),
+                "report_type": "DAILY_RETAIL",
+            },
+            {
+                "commodity": "Bangus",
+                "category": "Fish",
+                "unit": "kg",
+                "market": "Test Market",
+                "price_low": 100.0,
+                "price_high": 120.0,
+                "price_prevailing": 110.0,
+                "price_average": None,
+                "report_date": date(2025, 1, 20),
+                "report_type": "DAILY_RETAIL",
+            },
+        ],
+    )
+
+    scrape_daily_prices.apply(args=["https://example.com/sample.pdf"]).get()
+
+    verification_session = session_factory()
+    try:
+        run = verification_session.query(IngestionRun).one()
+        assert run.entries_processed == 2
+        assert run.entries_inserted == 1
+        assert run.entries_updated == 0
+        assert run.entries_skipped == 1
+        assert run.anomaly_count == 1
+        assert run.anomaly_flags == ["duplicate_entries_in_source:1"]
     finally:
         verification_session.close()
 
