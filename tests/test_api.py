@@ -2,8 +2,7 @@
 Tests for API endpoints.
 """
 
-from datetime import UTC, datetime
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 

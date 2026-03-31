@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import PaginationParams, get_pagination_params, get_price_filters
 from app.core.rate_limiter import limiter
 from app.db.session import get_db
-from app.schemas.price_filters import PriceFilters, PriceView
 from app.schemas.price_entry import PaginatedPriceResponse, PriceEntry, PriceEntryCompact, PriceEntryListItem
+from app.schemas.price_filters import PriceFilters, PriceView
 from app.services.price_service import PriceService
 
 router = APIRouter()

@@ -12,6 +12,7 @@ ignore = ["E501"]  # Allow longer lines (enforced by formatter at 120)
 "tests/debug_*.py" = ["E402"]
 "tests/test_2025_alignment.py" = ["E402"]
 "tests/test_ai_ingestion.py" = ["E402"]
+"app/main.py" = ["E402"]
 # Alembic migrations are auto-generated
 "alembic/versions/*.py" = ["E501"]
 
