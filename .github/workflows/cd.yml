@@ -8,12 +8,12 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  REGISTRY: ${{ secrets.AZURE_CR }}
+  IMAGE_NAME: agri-bantay-presyo
 
 jobs:
   publish_image:
-    name: Build and Push
+    name: Build and Push to ACR
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,9 +28,9 @@ jobs:
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ secrets.AZURE_CR }}
+          username: ${{ secrets.AZURE_CR_USERNAME }}
+          password: ${{ secrets.AZURE_CR_PASSWORD }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -38,31 +38,40 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.AZURE_CR }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ secrets.AZURE_CR }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy_vps:
-    name: Deploy to VPS
+  deploy_azure:
+    name: Deploy to Azure Container Apps
     runs-on: ubuntu-latest
     needs: publish_image
-    if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
-      packages: read
+
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -euo pipefail
-            cd "${{ secrets.VPS_APP_DIR }}"
-            git fetch --all --tags
-            git checkout "${{ github.sha }}"
-            echo "${{ secrets.GHCR_PAT }}" | docker login ${{ env.REGISTRY }} -u "${{ github.actor }}" --password-stdin
-            export APP_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-            ./scripts/deploy_prod.sh
+          creds: ${{ secrets.AZURE_SP }}
+
+      - name: Azure Container Apps Build
+        uses: azure/container-apps-deploy@v1
+        with:
+          acrName: ${{ secrets.AZURE_CR_NAME }}
+          containerAppName: ${{ secrets.AZURE_APP_NAME }}
+          resourceGroup: ${{ secrets.AZURE_RG }}
+          containerAppEnvironment: ${{ secrets.AZURE_ENV }}
+          imageToDeploy: ${{ secrets.AZURE_CR }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          targetPort: '8000'
+          environmentVariables: |
+            APP_ENV=production
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            RATE_LIMIT_STORAGE_URL=${{ secrets.REDIS_URL }}
+            API_KEY=${{ secrets.API_KEY }}
+            LOG_LEVEL=INFO
+            LOG_AS_JSON=true
+            CELERY_BEAT_SCHEDULE_FILE=/app/data/celerybeat-schedule
+            INGESTION_STALENESS_HOURS=36
